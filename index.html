@@ -376,8 +376,8 @@
 
   <!-- ===================== JS ===================== -->
   <script>
-    // ===== BACKEND URL (تم التحديث) =====
-    const API_BASE = "https://script.google.com/macros/s/AKfycbxCYTMq6s958hNtiJAmwx7qXvIHz-5qnyt2McDvCe0nSZ1DqoROiDZcPDJpedPcJEbE/exec";
+    // ===== BACKEND URL =====
+    const API_BASE = "https://script.google.com/macros/s/AKfycbwaK1PlV03hISpKjDfw3lN7mghM7w5ZRDZ98JsliukyKJ8cO2x3aBYhGmDIFyDrDWEg/exec";
 
     // ===== Utils =====
     const rememberKey = 'portalRememberV2';
@@ -409,6 +409,7 @@
         mode: "cors",
         credentials: "omit"
       });
+      // حاول نقرأ JSON حتى لو في خطأ
       let data;
       try{ data = await res.json(); }
       catch(e){
@@ -574,6 +575,7 @@
         placeholder.classList.add('hidden');
         btnOpen.href = clean;
         btnExpand.onclick = ()=> open3DModal(clean);
+        // Double click to expand
         iframe.ondblclick = ()=> open3DModal(clean);
       }else{
         card.classList.add('hidden');
