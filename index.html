@@ -1,23 +1,1495 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr" id="htmlRoot">
 <head>
   <meta charset="UTF-8" />
-  <title>My WebApp Wrapper</title>
+  <title>Enhanced Project Portal</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      overflow: hidden;
+    :root { 
+      --clr-primary-start:#eba91e; 
+      --clr-primary-end:#2e2e2e; 
     }
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
+    .font-en { font-family:'Inter',sans-serif; }
+    .font-ar { font-family:'Cairo',sans-serif; }
+    .gradient-bg { 
+      background: linear-gradient(135deg,var(--clr-primary-start) 0%,var(--clr-primary-end) 50%,var(--clr-primary-start) 100%); 
+      animation: gradientShift 8s ease-in-out infinite; 
     }
+    @keyframes gradientShift { 
+      0%,100%{background:linear-gradient(135deg,var(--clr-primary-start) 0%,var(--clr-primary-end) 50%,var(--clr-primary-start) 100%);} 
+      50%{background:linear-gradient(135deg,var(--clr-primary-end) 0%,var(--clr-primary-start) 50%,var(--clr-primary-end) 100%);} 
+    }
+    .card-hover{transition:transform .3s ease, box-shadow .3s ease;}
+    .card-hover:hover{transform:translateY(-4px); box-shadow:0 16px 24px rgba(0,0,0,.1);}
+    .progress-ring{transform:rotate(-90deg);}
+    .gantt-chart { margin-top: 20px; }
+    .gantt-task { height: 30px; margin-bottom: 5px; position: relative; border-radius: 4px; overflow: hidden; }
+    .gantt-task-label { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: white; font-weight: bold; z-index: 2; font-size: 12px; }
+    .gantt-task-bar { height: 100%; position: absolute; top: 0; left: 0; }
+    .gantt-planned-bar { background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%); }
+    .gantt-actual-bar { background: linear-gradient(90deg, #10b981 0%, #059669 100%); opacity: 0.8; }
+    .gantt-milestone { position: absolute; top: 0; width: 4px; height: 100%; background: #ef4444; z-index: 3; }
+    .gantt-timeline { display: flex; justify-content: space-between; margin-top: 10px; padding: 0 10px; }
+    .gantt-timeline-item { font-size: 10px; color: #6b7280; }
+    .ratio-box{position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:1rem;background:#f8fafc;}
+    .ratio-box iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:1rem;}
+    .unit-tab{cursor:pointer;padding:.5rem 1rem;border-radius:.75rem;font-weight:600;transition:all 0.3s ease;}
+    .unit-tab.active{background:linear-gradient(135deg,#eba91e,#f59e0b);color:#fff;transform:translateY(-2px);}
+    .fade-in{animation:fadeIn 0.5s ease-in;}
+    @keyframes fadeIn{from{opacity:0;} to{opacity:1;}}
+    .grid-stack{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));}
+    .analytics-card{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);}
+    .performance-card{background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%);}
+    .financial-card{background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);}
+    .team-card{background:linear-gradient(135deg,#43e97b 0%,#38f9d7 100%);}
   </style>
 </head>
-<body>
-  <iframe src="https://script.google.com/macros/s/AKfycbzyUffYUoGA795stsvS_WmpNyVXJFPb87QLnhHdlqJDyqxytyaKuLezQWmOEfI3pIoc/exec?view=page"></iframe>
+<body class="bg-gray-50 min-h-screen font-en">
+  <!-- LOGIN -->
+  <section id="loginScreen" class="min-h-screen gradient-bg flex items-center justify-center p-4">
+    <div class="bg-white/10 backdrop-blur-lg rounded-3xl p-8 w-full max-w-md shadow-xl">
+      <div class="text-center mb-8">
+        <div class="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <svg class="w-10 h-10 text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2L3 7v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7l-7-5z"/></svg>
+        </div>
+        <h1 class="text-3xl font-extrabold text-white">Enhanced Project Portal</h1>
+        <p class="text-white/90">Multi-Unit Client & Manager Platform</p>
+      </div>
+      <form id="loginForm" class="space-y-5">
+        <div>
+          <label class="block text-white/90 text-sm mb-1">Username</label>
+          <input id="username" type="text" class="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50" placeholder="Customer Name " required>
+        </div>
+        <div>
+          <label class="block text-white/90 text-sm mb-1">Password</label>
+          <input id="password" type="password" class="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50" placeholder="Customer code" required>
+        </div>
+        <label class="flex items-center gap-2 text-white/90 text-sm">
+          <input id="rememberMe" type="checkbox" class="w-4 h-4 rounded border-white/30 bg-white/20"> Remember me
+        </label>
+        <button type="submit" class="w-full bg-white text-amber-700 py-3 rounded-xl font-semibold hover:bg-gray-100">Sign In</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- CLIENT DASHBOARD -->
+  <section id="clientDashboard" class="hidden">
+    <header class="bg-white shadow border-b">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 bg-gradient-to-br from-amber-500 to-yellow-600 rounded-xl flex items-center justify-center">
+            <svg class="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4z"/></svg>
+          </div>
+          <div>
+            <h1 class="text-2xl font-bold bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent" id="dashboardTitle">Client Portal</h1>
+            <p class="text-sm text-gray-600" id="dashboardSubtitle">Multi-Unit Digital Project Report</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-6">
+          <div class="text-right">
+            <p id="welcomeUser" class="text-sm font-semibold text-gray-900">Welcome, --</p>
+            <p id="unitCount" class="text-xs text-gray-500">Units: --</p>
+            <p id="lastUpdate" class="text-xs text-gray-400">Last updated: --</p>
+          </div>
+          <button onclick="logout()" class="text-gray-500 hover:text-red-500 p-2 rounded-lg hover:bg-red-50" title="Logout">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <!-- Unit Tabs - Only show for multiple units -->
+      <div id="unitTabs" class="hidden mb-8 fade-in">
+        <div class="bg-white rounded-2xl shadow-lg p-6">
+          <h3 class="text-lg font-bold text-gray-900 mb-4">Select Unit to View Details</h3>
+          <div id="unitTabsContainer" class="flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+
+      <div id="unitContent" class="fade-in">
+        <!-- Unit Info -->
+        <div class="bg-gradient-to-br from-white via-amber-50 to-yellow-50 rounded-3xl shadow-xl p-8 mb-8 card-hover border border-amber-200">
+          <div class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-4">
+              <h2 class="text-3xl font-bold bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent">Unit Information</h2>
+              <div class="flex items-center gap-2 px-3 py-1 bg-green-100 rounded-full">
+                <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span class="text-xs font-medium text-green-700">Verified</span>
+              </div>
+            </div>
+            <div class="w-14 h-14 bg-gradient-to-br from-amber-500 to-yellow-600 rounded-xl flex items-center justify-center">
+              <svg class="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a1 1 0 0 1-1-1h12a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4zM3 10a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6zM14 9a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1h-2z"/></svg>
+            </div>
+          </div>
+          <div class="bg-white rounded-2xl p-6 shadow-lg mb-6">
+            <div class="flex items-center gap-3 mb-2">
+              <svg class="w-6 h-6 text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+              <p class="text-sm text-amber-700 font-semibold uppercase tracking-wide">Client Name</p>
+            </div>
+            <p id="clientNameValue" class="text-2xl font-bold text-gray-900 ml-9">--</p>
+          </div>
+          <div class="bg-white rounded-2xl p-6 shadow-lg">
+            <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+              <svg class="w-6 h-6 text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              Basic Information
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div class="bg-gradient-to-br from-amber-50 to-yellow-100 p-4 rounded-xl border border-amber-200 shadow-sm">
+                <p class="text-xs text-amber-700 mb-1 font-medium uppercase">Compound Name</p>
+                <p id="compoundValue" class="font-bold text-gray-900 text-sm">--</p>
+              </div>
+              <div class="bg-gradient-to-br from-amber-50 to-yellow-100 p-4 rounded-xl border border-amber-200 shadow-sm">
+                <p class="text-xs text-amber-700 mb-1 font-medium uppercase">Unit Type</p>
+                <p id="unitTypeValue" class="font-bold text-gray-900 text-sm">--</p>
+              </div>
+              <div class="bg-gradient-to-br from-gray-50 to-slate-100 p-4 rounded-xl border shadow-sm">
+                <p class="text-xs text-gray-700 mb-1 font-medium uppercase">Unit Number</p>
+                <p id="unitNumberValue" class="font-bold text-gray-900 text-sm">--</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+              <div class="bg-gradient-to-br from-blue-50 to-indigo-100 p-4 rounded-xl border shadow-sm">
+                <p class="text-xs text-blue-700 mb-1 font-medium uppercase">Number of Floors</p>
+                <p id="floorsValue" class="font-bold text-gray-900 text-sm">--</p>
+              </div>
+              <div class="bg-gradient-to-br from-green-50 to-emerald-100 p-4 rounded-xl border shadow-sm">
+                <p class="text-xs text-green-700 mb-1 font-medium uppercase">Indoor Area</p>
+                <p id="indoorAreaValue" class="font-bold text-gray-900 text-sm">--</p>
+              </div>
+              <div class="bg-gradient-to-br from-purple-50 to-violet-100 p-4 rounded-xl border shadow-sm">
+                <p class="text-xs text-purple-700 mb-1 font-medium uppercase">Outdoor Area</p>
+                <p id="outdoorAreaValue" class="font-bold text-gray-900 text-sm">--</p>
+              </div>
+            </div>
+            <div class="mt-6">
+              <h4 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4z"/></svg>
+                Project Details
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="bg-gradient-to-br from-emerald-50 to-green-100 p-4 rounded-xl border shadow-sm">
+                  <p class="text-xs text-emerald-700 mb-1 font-medium uppercase">Design Type</p>
+                  <p id="designTypeVal" class="font-bold text-gray-900 text-sm">--</p>
+                </div>
+                <div class="bg-gradient-to-br from-rose-50 to-red-100 p-4 rounded-xl border shadow-sm">
+                  <p class="text-xs text-rose-700 mb-1 font-medium uppercase">Design Status</p>
+                  <p id="designStatusVal" class="font-bold text-gray-900 text-sm">--</p>
+                </div>
+                <div class="bg-gradient-to-br from-amber-50 to-yellow-100 p-4 rounded-xl border border-amber-200 shadow-sm">
+                  <p class="text-xs text-amber-700 mb-1 font-medium uppercase">Execution Status</p>
+                  <p id="projectStatusVal" class="font-bold text-gray-900 text-sm">--</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3D -->
+        <div id="threeDCard" class="bg-white rounded-3xl shadow-xl p-8 mb-8 card-hover border hidden fade-in">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-2xl font-bold text-gray-900">3D Interactive View</h3>
+            <div class="flex items-center gap-3">
+              <a id="btnOpen3DNew" target="_blank" rel="noopener" class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-sm">Open in new tab</a>
+              <button id="btnExpand3D" class="px-3 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 text-sm">Expand</button>
+            </div>
+          </div>
+          <div class="ratio-box">
+            <iframe id="threeDIframe" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen webkitallowfullscreen mozallowfullscreen></iframe>
+            <div id="threeDPlaceholder" class="absolute inset-0 flex items-center justify-center text-gray-500">No 3D view available.</div>
+          </div>
+        </div>
+
+        <!-- Progress & Timeline -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+          <div class="bg-white rounded-3xl shadow-xl p-8 card-hover border fade-in">
+            <div class="flex items-center gap-3 mb-8">
+              <svg class="w-8 h-8 text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <h3 class="text-2xl font-bold text-gray-900">Execution Progress</h3>
+            </div>
+            <div class="flex items-center justify-center mb-8">
+              <div class="relative w-40 h-40">
+                <svg class="w-40 h-40 progress-ring">
+                  <circle cx="80" cy="80" r="70" stroke="#f3f4f6" stroke-width="12" fill="none"></circle>
+                  <circle id="progressCircle" cx="80" cy="80" r="70" stroke="url(#progressGradient)" stroke-width="12" fill="none" stroke-dasharray="439.82" stroke-dashoffset="439.82" class="transition-all duration-700"></circle>
+                  <defs>
+                    <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" style="stop-color:#eba91e"/><stop offset="50%" style="stop-color:#f59e0b"/><stop offset="100%" style="stop-color:#fbbf24"/>
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                  <span id="progressPercentage" class="text-4xl font-bold bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent">--%</span>
+                  <span class="text-sm text-gray-600 mt-1">Completed</span>
+                </div>
+              </div>
+            </div>
+            <div class="text-center">
+              <div id="projectStatusChip" class="px-6 py-3 rounded-2xl text-sm font-semibold inline-block bg-amber-500/10 text-amber-700 mb-3">--</div>
+              <p id="overallProgressText" class="text-sm text-gray-600">--</p>
+            </div>
+          </div>
+
+          <div class="lg:col-span-2 bg-white rounded-3xl shadow-xl p-8 card-hover border fade-in">
+            <div class="flex items-center gap-3 mb-8">
+              <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M6 2a1 1 0 0 0-1 1v1H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1V3a1 1 0 1 0-2 0v1H7V3a1 1 0 0 0-1-1z"/></svg>
+              </div>
+              <div>
+                <h3 class="text-2xl font-bold text-gray-900">Project Timeline - <span id="currentPhaseLabel">Phase 1</span></h3>
+                <p class="text-sm text-gray-600">Execution Progress (Gantt Chart)</p>
+              </div>
+            </div>
+            
+            <!-- Gantt Chart -->
+            <div class="gantt-chart">
+              <div class="flex items-center gap-6 mb-6 justify-center">
+                <div class="flex items-center gap-2"><div class="w-4 h-4 bg-blue-500 rounded-full"></div><span class="text-sm font-medium text-gray-700">Planned</span></div>
+                <div class="flex items-center gap-2"><div class="w-4 h-4 bg-green-500 rounded-full"></div><span class="text-sm font-medium text-gray-700">Actual</span></div>
+                <div class="flex items-center gap-2"><div class="w-4 h-4 bg-red-500 rounded-full"></div><span class="text-sm font-medium text-gray-700">Milestones</span></div>
+              </div>
+              
+              <div id="ganttContainer" class="space-y-4">
+                <!-- Gantt tasks will be dynamically generated here -->
+              </div>
+              
+              <div class="gantt-timeline" id="ganttTimeline">
+                <!-- Timeline will be dynamically generated here -->
+              </div>
+            </div>
+            
+            <!-- Timeline Details -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm mt-8">
+              <div class="bg-blue-50 p-4 rounded-lg">
+                <h4 class="font-semibold text-blue-800 mb-2">Planned Schedule</h4>
+                <div class="space-y-1">
+                  <div class="flex justify-between"><span>Start:</span><span id="plannedStartDate" class="font-medium">--</span></div>
+                  <div class="flex justify-between"><span>End:</span><span id="plannedEndDate" class="font-medium">--</span></div>
+                  <div class="flex justify-between"><span>Duration:</span><span id="plannedDuration" class="font-medium">--</span></div>
+                </div>
+              </div>
+              <div class="bg-green-50 p-4 rounded-lg">
+                <h4 class="font-semibold text-green-800 mb-2">Actual Progress</h4>
+                <div class="space-y-1">
+                  <div class="flex justify-between"><span>Start:</span><span id="actualStartDate" class="font-medium">--</span></div>
+                  <div class="flex justify-between"><span>End:</span><span id="actualEndDate" class="font-medium">--</span></div>
+                  <div class="flex justify-between"><span>Progress:</span><span id="timelineProgress" class="font-medium">--</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Work Breakdown -->
+        <div class="bg-white rounded-3xl shadow-xl p-8 mb-8 card-hover border fade-in">
+          <h3 class="text-3xl font-bold text-gray-900 mb-8">Work Progress Breakdown - <span id="workPhaseLabel">Phase 1</span></h3>
+          <div id="workGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+        </div>
+
+        <!-- Team -->
+        <div class="bg-white rounded-3xl shadow-xl p-8 card-hover border fade-in">
+          <h3 class="text-3xl font-bold text-gray-900 mb-8">Project Team</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div class="text-center p-6 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl border shadow-sm">
+              <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zm-7 9a7 7 0 1114 0H3z"/></svg>
+              </div>
+              <h4 id="teamLeaderName" class="font-bold text-gray-900 mb-2 text-lg">--</h4>
+              <p class="text-sm text-blue-600 font-medium">Engineering Team Leader</p>
+            </div>
+            <div class="text-center p-6 bg-gradient-to-br from-green-50 to-emerald-100 rounded-2xl border shadow-sm">
+              <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </div>
+              <h4 id="siteManagerName" class="font-bold text-gray-900 mb-2 text-lg">--</h4>
+              <p class="text-sm text-green-600 font-medium">Site Manager</p>
+            </div>
+            <div class="text-center p-6 bg-gradient-to-br from-purple-50 to-violet-100 rounded-2xl border shadow-sm">
+              <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-violet-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+              </div>
+              <h4 id="teamLeaderNameTeam" class="font-bold text-gray-900 mb-2 text-lg">--</h4>
+              <p class="text-sm text-purple-600 font-medium">Team Leader</p>
+            </div>
+            <div class="text-center p-6 bg-gradient-to-br from-orange-50 to-amber-100 rounded-2xl border shadow-sm">
+              <div class="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-600 rounded-full flex items around justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z"/></svg>
+              </div>
+              <h4 id="accountManagerNameTeam" class="font-bold text-gray-900 mb-2 text-lg">--</h4>
+              <p class="text-sm text-orange-600 font-medium">Account Manager</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- MANAGER DASHBOARD -->
+  <section id="managerDashboard" class="hidden">
+    <header class="bg-gradient-to-r from-slate-900 to-gray-800 text-white">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center">
+            <svg class="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <div>
+            <h1 class="text-2xl font-bold">Manager Dashboard</h1>
+            <p class="text-sm text-gray-300">Complete Project Overview & Analytics</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="text-right mr-4">
+            <p id="managerLastUpdate" class="text-xs text-gray-300">Last updated: --</p>
+          </div>
+          <button onclick="exportToExcel()" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium text-white">
+            <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Export Excel
+          </button>
+          <button onclick="viewDetailedAnalytics()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white">
+            <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2z"/></svg>
+            Analytics
+          </button>
+          <button onclick="logout()" class="text-gray-300 hover:text-red-400 p-2 rounded-lg hover:bg-red-500/10" title="Logout">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <!-- Quick Stats Overview -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div class="analytics-card text-white rounded-2xl p-6 shadow-xl">
+          <div class="flex items-center justify-between mb-4">
+            <svg class="w-8 h-8 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            <span class="text-xs bg-white/20 px-2 py-1 rounded-full">Projects</span>
+          </div>
+          <p class="text-3xl font-bold" id="totalProjectsCount">0</p>
+          <p class="text-sm opacity-80 mt-1">Total Projects</p>
+        </div>
+
+        <div class="performance-card text-white rounded-2xl p-6 shadow-xl">
+          <div class="flex items-center justify-between mb-4">
+            <svg class="w-8 h-8 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="text-xs bg-white/20 px-2 py-1 rounded-full">Progress</span>
+          </div>
+          <p class="text-3xl font-bold" id="avgProgressValue">0%</p>
+          <p class="text-sm opacity-80 mt-1">Avg Progress</p>
+        </div>
+
+        <div class="financial-card text-white rounded-2xl p-6 shadow-xl">
+          <div class="flex items-center justify-between mb-4">
+            <svg class="w-8 h-8 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="text-xs bg-white/20 px-2 py-1 rounded-full">Revenue</span>
+          </div>
+          <p class="text-3xl font-bold" id="totalValueAmount">--</p>
+          <p class="text-sm opacity-80 mt-1">Total Value</p>
+        </div>
+
+        <div class="team-card text-white rounded-2xl p-6 shadow-xl">
+          <div class="flex items-center justify-between mb-4">
+            <svg class="w-8 h-8 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            <span class="text-xs bg-white/20 px-2 py-1 rounded-full">Teams</span>
+          </div>
+          <p class="text-3xl font-bold" id="activeTeamsCount">0</p>
+          <p class="text-sm opacity-80 mt-1">Active Teams</p>
+        </div>
+      </div>
+
+      <!-- Charts Section -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Progress Distribution -->
+        <div class="bg-white rounded-2xl shadow-xl p-6">
+          <h3 class="text-xl font-bold text-gray-900 mb-6">Project Progress Distribution</h3>
+          <div class="h-80">
+            <canvas id="progressChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Status Overview -->
+        <div class="bg-white rounded-2xl shadow-xl p-6">
+          <h3 class="text-xl font-bold text-gray-900 mb-6">Execution Status Overview</h3>
+          <div class="h-80">
+            <canvas id="statusChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Team Performance -->
+      <div class="bg-white rounded-2xl shadow-xl p-6">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-xl font-bold text-gray-900">Team Performance Analytics</h3>
+          <select id="teamFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="all">All Teams</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6" id="teamStats"></div>
+        <div class="h-80">
+          <canvas id="teamChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Advanced Filters & Search -->
+      <div class="bg-white rounded-2xl shadow-xl p-6">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-xl font-bold text-gray-900">Projects Management</h3>
+          <div class="flex items-center gap-3">
+            <select id="statusFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              <option value="all">All Status</option>
+              <option value="on-time">On Time</option>
+              <option value="delayed">Delayed</option>
+              <option value="critical">Critical</option>
+              <option value="completed">Completed</option>
+            </select>
+            <select id="phaseFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              <option value="all">All Phases</option>
+              <option value="Phase 1">Phase 1</option>
+              <option value="Phase 2">Phase 2</option>
+            </select>
+            <input id="projectSearch" class="px-4 py-2 border border-gray-300 rounded-lg w-64 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Search projects...">
+            <button onclick="refreshManagerData()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
+              <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- Projects Grid -->
+        <div id="projectsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="bg-white rounded-2xl shadow-xl p-6">
+        <h3 class="text-xl font-bold text-gray-900 mb-6">Quick Actions & Reports</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <button onclick="generatePerformanceReport()" class="flex flex-col items-center justify-center p-6 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all duration-300">
+            <svg class="w-8 h-8 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2z"/></svg>
+            <span class="font-semibold">Performance</span>
+            <span class="text-xs opacity-80 mt-1">Report</span>
+          </button>
+          
+          <button onclick="viewTeamAnalytics()" class="flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-300">
+            <svg class="w-8 h-8 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            <span class="font-semibold">Team</span>
+            <span class="text-xs opacity-80 mt-1">Analytics</span>
+          </button>
+          
+          <button onclick="financialOverview()" class="flex flex-col items-center justify-center p-6 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300">
+            <svg class="w-8 h-8 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="font-semibold">Financial</span>
+            <span class="text-xs opacity-80 mt-1">Overview</span>
+          </button>
+          
+          <button onclick="criticalAlerts()" class="flex flex-col items-center justify-center p-6 bg-gradient-to-br from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all duration-300">
+            <svg class="w-8 h-8 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            <span class="font-semibold">Critical</span>
+            <span class="text-xs opacity-80 mt-1">Alerts</span>
+          </button>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- MODALS -->
+  <div id="projectDetailModal" class="fixed inset-0 hidden items-center justify-center bg-black/50 z-50 p-4">
+    <div class="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between p-6 border-b">
+        <h3 id="projectDetailTitle" class="text-xl font-bold text-gray-900">Project Details</h3>
+        <button onclick="closeProjectDetailModal()" class="p-2 hover:bg-gray-100 rounded-lg">
+          <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="projectDetailContent" class="p-6 space-y-6"></div>
+    </div>
+  </div>
+
+  <div id="teamAnalyticsModal" class="fixed inset-0 hidden items-center justify-center bg-black/50 z-50 p-4">
+    <div class="bg-white w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between p-6 border-b">
+        <h3 class="text-xl font-bold text-gray-900">Team Performance Analytics</h3>
+        <button onclick="closeTeamAnalyticsModal()" class="p-2 hover:bg-gray-100 rounded-lg">
+          <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="teamAnalyticsContent" class="p-6 space-y-6"></div>
+    </div>
+  </div>
+
+  <script>
+    // Global variables
+    let _managerData = null;
+    let _currentAuth = null;
+    let _charts = {};
+
+    // Utility functions
+    const clampPct = v => { 
+      const n = Number(String(v ?? 0).replace('%','')); 
+      return isNaN(n) ? 0 : Math.max(0, Math.min(100, Math.round(n))); 
+    };
+
+    const statusKey = s => { 
+      const x = String(s || '').toLowerCase(); 
+      if (x.includes('done')||x.includes('complete')) return 'completed'; 
+      if (x.includes('critical')||x.includes('hold')) return 'critical'; 
+      if (x.includes('delay')||x.includes('not')) return 'delayed'; 
+      return 'on-time'; 
+    };
+
+    const formatCurrency = amount => {
+      const n = Number(amount);
+      if (!isFinite(n)) return '--';
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'EGP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(n);
+    };
+
+    const setTxt = (id, v) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = (v ?? '--');
+    };
+
+    // Function to get last Sunday
+    function getLastSunday() {
+      const today = new Date();
+      const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      const diff = today.getDate() - dayOfWeek; // Adjust to last Sunday
+      const lastSunday = new Date(today.setDate(diff));
+      return lastSunday.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    }
+
+    // Authentication functions
+    (function() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('enhancedPortalRememberV7') || 'null');
+        if (saved && saved.u && saved.p) {
+          const u = atob(saved.u), p = atob(saved.p);
+          google.script.run.withSuccessHandler(res => onAuth(res, true, saved)).authenticate(u, p);
+        }
+      } catch (e) {}
+    })();
+
+    document.getElementById('loginForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const u = document.getElementById('username').value.trim();
+      const p = document.getElementById('password').value.trim();
+      const remember = document.getElementById('rememberMe').checked;
+      google.script.run.withSuccessHandler(res => onAuth(res, remember, { u: btoa(u), p: btoa(p) })).authenticate(u, p);
+    });
+
+    function onAuth(res, remember, creds) {
+      if (!res || !res.ok) { alert(res?.error || 'Login failed'); return; }
+      document.getElementById('loginScreen').classList.add('hidden');
+      if (remember && creds) { 
+        localStorage.setItem('enhancedPortalRememberV7', JSON.stringify({ u: creds.u, p: creds.p, role: res.role })); 
+      }
+      _currentAuth = res;
+      
+      // Set last update date
+      const lastUpdate = getLastSunday();
+      setTxt('lastUpdate', `Last updated: ${lastUpdate}`);
+      setTxt('managerLastUpdate', `Last updated: ${lastUpdate}`);
+      
+      if (res.role === 'manager') {
+        document.getElementById('managerDashboard').classList.remove('hidden');
+        loadManagerData();
+      } else {
+        document.getElementById('clientDashboard').classList.remove('hidden');
+        loadClient(res);
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('enhancedPortalRememberV7');
+      document.getElementById('clientDashboard').classList.add('hidden');
+      document.getElementById('managerDashboard').classList.add('hidden');
+      document.getElementById('loginScreen').classList.remove('hidden');
+      _managerData = null;
+      _currentAuth = null;
+      
+      // Destroy charts
+      Object.values(_charts).forEach(chart => {
+        if (chart) chart.destroy();
+      });
+      _charts = {};
+    }
+
+    // Client Dashboard Functions
+    function loadClient(auth) {
+      setTxt('welcomeUser', `Welcome, ${auth.name}`);
+      
+      // Clear any existing unit tabs
+      document.getElementById('unitTabsContainer').innerHTML = '';
+      
+      if (auth.units && auth.units.length > 1) {
+        setTxt('dashboardTitle', `${auth.name}'s Portfolio`);
+        setTxt('dashboardSubtitle', `${auth.units.length} Units Overview`);
+        setTxt('unitCount', `Units: ${auth.units.length}`);
+        setupUnitTabs(auth.units);
+        switchUnit(auth.units[0].sd06Code);
+      } else if (auth.units && auth.units.length === 1) {
+        const unit = auth.units[0];
+        setTxt('dashboardTitle', `${unit.unitName || 'Unit'} Details`);
+        setTxt('dashboardSubtitle', unit.compound ? `at ${unit.compound}` : 'Project Details');
+        setTxt('unitCount', '');
+        // Hide unit tabs section for single unit
+        document.getElementById('unitTabs').classList.add('hidden');
+        safeLoadUnit(unit.sd06Code);
+      } else if (auth.sd06Code) {
+        setTxt('dashboardTitle', 'Unit Details');
+        setTxt('dashboardSubtitle', 'Project Overview');
+        setTxt('unitCount', '');
+        // Hide unit tabs section for single unit
+        document.getElementById('unitTabs').classList.add('hidden');
+        safeLoadUnit(auth.sd06Code);
+      } else {
+        alert('No unit information available for this user');
+      }
+    }
+
+    function setupUnitTabs(units) {
+      const tabsSection = document.getElementById('unitTabs');
+      const container = document.getElementById('unitTabsContainer');
+      tabsSection.classList.remove('hidden');
+      container.innerHTML = units.map((unit, index) => {
+        const isActive = index === 0 ? 'active' : '';
+        const title = unit.compound || unit.unitName || unit.sd06Code;
+        const sub = unit.unitName && unit.compound ? unit.unitName : '';
+        return `<button class="unit-tab ${isActive}" onclick="switchUnit('${unit.sd06Code}')" data-unit="${unit.sd06Code}">
+          <div class="text-sm font-semibold">${title}</div>
+          ${sub ? `<div class="text-xs text-gray-600">${sub}</div>` : ''}
+        </button>`;
+      }).join('');
+    }
+
+    function switchUnit(sd06Code) {
+      document.querySelectorAll('.unit-tab').forEach(tab => tab.classList.remove('active'));
+      const selected = document.querySelector(`[data-unit="${sd06Code}"]`);
+      if (selected) selected.classList.add('active');
+      
+      document.getElementById('unitContent').classList.remove('fade-in');
+      setTimeout(() => {
+        safeLoadUnit(sd06Code);
+      }, 50);
+    }
+
+    function safeLoadUnit(sd06Code) {
+      google.script.run
+        .withFailureHandler(err => {
+          alert('Error loading unit data: ' + (err?.message || err));
+          document.getElementById('unitContent').classList.add('fade-in');
+        })
+        .withSuccessHandler(d => {
+          renderClient(d);
+          document.getElementById('unitContent').classList.add('fade-in');
+        })
+        .getClientReport({ sd06Code });
+    }
+
+    function renderClient(d) {
+      if (!d || !d.ok) { alert('Client data not found'); return; }
+      
+      const u = d.unit || {};
+      const design = d.design || {};
+      const ex = d.execution || {};
+      const timeline = d.executionTimeline || {};
+      const currentPhase = d.currentPhase || 'Phase 1';
+
+      // Update phase labels
+      setTxt('currentPhaseLabel', currentPhase);
+      setTxt('workPhaseLabel', currentPhase);
+
+      // Unit Information
+      setTxt('clientNameValue', u.clientName);
+      setTxt('compoundValue', u.compound);
+      setTxt('unitTypeValue', u.unitType);
+      setTxt('unitNumberValue', u.unitNumber);
+      setTxt('floorsValue', u.floors);
+      setTxt('indoorAreaValue', u.areaIndoor);
+      setTxt('outdoorAreaValue', u.areaOutdoor);
+
+      // Project Details
+      setTxt('designTypeVal', design.designType || '--');
+      setTxt('designStatusVal', design.designStatus || '--');
+      setTxt('projectStatusVal', design.projectStatus || '--');
+
+      // Progress Section
+      const completion = clampPct(ex?.completion);
+      animateCircle('progressCircle', 'progressPercentage', completion);
+      
+      // Set status chip and progress text based on execution data
+      const hasExecutionData = ex && Object.keys(ex).length > 0;
+      if (hasExecutionData) {
+        setStatusChip(ex?.status);
+        setTxt('overallProgressText', ex?.overallProgress || '');
+      } else {
+        // If no execution data, show IN PROGRESS status
+        document.getElementById('projectStatusChip').className = 'px-6 py-3 rounded-2xl text-sm font-semibold inline-block bg-blue-500/10 text-blue-700 mb-3';
+        document.getElementById('projectStatusChip').textContent = 'IN PROGRESS';
+        setTxt('overallProgressText', 'Project is currently in progress');
+      }
+
+      // Timeline - Handle case when no execution data exists
+      const planned = timeline.planned || {};
+      const actual = timeline.actual || {};
+      
+      setTxt('executionPlannedDates', formatDateRange(planned.start, planned.end));
+      setTxt('executionActualDates', formatDateRange(actual.start, actual.end || 'In Progress'));
+      
+      // If no execution data, hide the timeline colors
+      const timelineProgress = hasExecutionData ? calculateTimelineProgress(actual.start, actual.end) : 0;
+      
+      setTxt('plannedStartDate', planned.start ? new Date(planned.start).toLocaleDateString() : '--');
+      setTxt('plannedEndDate', planned.end ? new Date(planned.end).toLocaleDateString() : '--');
+      setTxt('plannedDuration', calculateDuration(planned.start, planned.end));
+      
+      setTxt('actualStartDate', actual.start ? new Date(actual.start).toLocaleDateString() : '--');
+      setTxt('actualEndDate', actual.end ? new Date(actual.end).toLocaleDateString() : 'In Progress');
+      setTxt('timelineProgress', `${timelineProgress}%`);
+
+      // Render Gantt Chart
+      renderGanttChart(planned, actual, timelineProgress);
+
+      // Work Progress Breakdown
+      renderWorkProgress(ex.work || {}, currentPhase);
+
+      // Team Information - Engineering Team Leader now comes from Execution sheet
+      const team = ex.team || {};
+      setTxt('teamLeaderName', team.teamLeader || '--'); // Engineering Team Leader from Execution
+      setTxt('siteManagerName', team.siteManager || '--');
+      setTxt('teamLeaderNameTeam', team.teamLeader || '--'); // Team Leader card
+      setTxt('accountManagerNameTeam', u.accountManager || '--');
+
+      // 3D View
+      setup3D(d.view3D);
+    }
+
+    function renderGanttChart(planned, actual, progress) {
+      const container = document.getElementById('ganttContainer');
+      const timeline = document.getElementById('ganttTimeline');
+      
+      if (!planned.start || !planned.end) {
+        container.innerHTML = '<div class="text-center text-gray-500 py-8">No timeline data available</div>';
+        timeline.innerHTML = '';
+        return;
+      }
+      
+      const plannedStart = new Date(planned.start);
+      const plannedEnd = new Date(planned.end);
+      const actualStart = actual.start ? new Date(actual.start) : null;
+      const actualEnd = actual.end ? new Date(actual.end) : null;
+      const today = new Date();
+      
+      const totalDuration = plannedEnd - plannedStart;
+      const actualDuration = actualEnd ? actualEnd - actualStart : today - actualStart;
+      
+      // Calculate positions as percentages
+      const plannedWidth = 100;
+      const actualWidth = actualStart ? Math.min(100, (actualDuration / totalDuration) * 100) : 0;
+      
+      // Generate timeline markers
+      const timelineMarkers = [];
+      const startDate = plannedStart;
+      const endDate = plannedEnd;
+      const diffTime = Math.abs(endDate - startDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Add markers for each week or month depending on duration
+      const markerInterval = diffDays > 90 ? 30 : diffDays > 30 ? 7 : 1;
+      
+      for (let i = 0; i <= diffDays; i += markerInterval) {
+        const markerDate = new Date(startDate);
+        markerDate.setDate(startDate.getDate() + i);
+        const position = (i / diffDays) * 100;
+        timelineMarkers.push({
+          date: markerDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          position: position
+        });
+      }
+      
+      // Render Gantt tasks
+      container.innerHTML = `
+        <div class="gantt-task">
+          <div class="gantt-task-label">Planned Timeline</div>
+          <div class="gantt-task-bar gantt-planned-bar" style="width: ${plannedWidth}%"></div>
+        </div>
+        <div class="gantt-task">
+          <div class="gantt-task-label">Actual Progress</div>
+          <div class="gantt-task-bar gantt-actual-bar" style="width: ${actualWidth}%"></div>
+          ${actualStart ? `<div class="gantt-milestone" style="left: 0;" title="Actual Start: ${actualStart.toLocaleDateString()}"></div>` : ''}
+          ${actualEnd ? `<div class="gantt-milestone" style="left: ${actualWidth}%;" title="Actual End: ${actualEnd.toLocaleDateString()}"></div>` : ''}
+          ${!actualEnd ? `<div class="gantt-milestone" style="left: ${actualWidth}%; background: #f59e0b;" title="Today: ${today.toLocaleDateString()}"></div>` : ''}
+        </div>
+      `;
+      
+      // Render timeline
+      timeline.innerHTML = timelineMarkers.map(marker => 
+        `<div class="gantt-timeline-item" style="left: ${marker.position}%; transform: translateX(-50%);">${marker.date}</div>`
+      ).join('');
+    }
+
+    function renderWorkProgress(work, phase) {
+      const grid = document.getElementById('workGrid');
+      let workItems = [];
+
+      if (phase === 'Phase 1') {
+        workItems = [
+          ['🏗️ New Construction', work.newConstruction, 'bg-gradient-to-br from-amber-50 to-yellow-50', 'text-amber-800'],
+          ['🚿 Plumbing', work.plumbing, 'bg-gradient-to-br from-blue-50 to-indigo-50', 'text-blue-800'],
+          ['⚡ Electrical', work.electrical, 'bg-gradient-to-br from-yellow-50 to-amber-50', 'text-yellow-800'],
+          ['❄️ AC Installation', work.acInstallation, 'bg-gradient-to-br from-cyan-50 to-blue-50', 'text-cyan-800'],
+          ['🧱 Plastering', work.plastering, 'bg-gradient-to-br from-gray-50 to-slate-50', 'text-gray-800'],
+          ['🏗️ Gypsum Board', work.gypsumBoard, 'bg-gradient-to-br from-slate-50 to-gray-50', 'text-slate-800'],
+          ['🏺 Ceramic', work.ceramic, 'bg-gradient-to-br from-red-50 to-rose-50', 'text-red-800'],
+          ['💎 Marble', work.marble, 'bg-gradient-to-br from-purple-50 to-violet-50', 'text-purple-800'],
+          ['🎨 Painting Prep', work.paintingPrep, 'bg-gradient-to-br from-green-50 to-emerald-50', 'text-green-800']
+        ];
+      } else if (phase === 'Phase 2') {
+        workItems = [
+          ['🪵 Wooden', work.wooden, 'bg-gradient-to-br from-amber-50 to-orange-50', 'text-amber-800'],
+          ['🏠 LC/Smart', work.lcSmart, 'bg-gradient-to-br from-indigo-50 to-purple-50', 'text-indigo-800'],
+          ['⚡ Elec 2', work.elec2, 'bg-gradient-to-br from-yellow-50 to-amber-50', 'text-yellow-800'],
+          ['🚿 Plumbing 2', work.plumbing2, 'bg-gradient-to-br from-blue-50 to-indigo-50', 'text-blue-800'],
+          ['🔌 Futec', work.futec, 'bg-gradient-to-br from-purple-50 to-violet-50', 'text-purple-800'],
+          ['🏗️ Gypsum Cladding', work.gypsumCladding, 'bg-gradient-to-br from-gray-50 to-slate-50', 'text-gray-800'],
+          ['🔒 Security', work.security, 'bg-gradient-to-br from-red-50 to-rose-50', 'text-red-800'],
+          ['💎 Marble 2', work.marble2, 'bg-gradient-to-br from-purple-50 to-violet-50', 'text-purple-800'],
+          ['🏡 Exterior', work.exterior, 'bg-gradient-to-br from-green-50 to-emerald-50', 'text-green-800'],
+          ['❄️ HVAC 2', work.hvac2, 'bg-gradient-to-br from-cyan-50 to-blue-50', 'text-cyan-800'],
+          ['🍳 Kitchen', work.kitchen, 'bg-gradient-to-br from-orange-50 to-amber-50', 'text-orange-800'],
+          ['🪨 Granite', work.granite, 'bg-gradient-to-br from-stone-50 to-gray-50', 'text-stone-800'],
+          ['🎨 Painting 2', work.painting2, 'bg-gradient-to-br from-green-50 to-emerald-50', 'text-green-800']
+        ];
+      }
+
+      grid.innerHTML = workItems.map(([name, val, bgClass, textClass]) => {
+        const v = clampPct(val);
+        // Use light backgrounds with dark text for better visibility
+        return `<div class="space-y-4 p-4 ${bgClass} rounded-2xl border shadow-lg">
+          <div class="flex justify-between items-center">
+            <span class="text-sm font-semibold ${textClass}">${name}</span>
+            <span class="text-lg font-bold ${textClass}">${v}%</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-4">
+            <div class="h-4 rounded-full transition-all duration-500 ${textClass.replace('text-', 'bg-').replace('-800', '-500')}" style="width:${v}%"></div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function setup3D(url) {
+      const card = document.getElementById('threeDCard');
+      const iframe = document.getElementById('threeDIframe');
+      const placeholder = document.getElementById('threeDPlaceholder');
+      const clean = (url || '').trim();
+      const ok = /^https?:\/\//i.test(clean);
+      
+      if (ok) {
+        card.classList.remove('hidden');
+        iframe.src = clean;
+        iframe.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+      } else {
+        card.classList.add('hidden');
+        iframe.src = '';
+      }
+    }
+
+    // Helper functions for timeline
+    function calculateTimelineProgress(startStr, endStr) {
+      const start = startStr ? new Date(startStr) : null;
+      const end = endStr ? new Date(endStr) : null;
+      const now = new Date();
+      
+      if (!start || !end || isNaN(start) || isNaN(end) || end <= start) return 0;
+      
+      const totalDuration = end - start;
+      const elapsed = now - start;
+      
+      return Math.min(Math.max(Math.round((elapsed / totalDuration) * 100), 0), 100);
+    }
+
+    function formatDateRange(start, end) {
+      if (!start && !end) return '--';
+      const f = ds => {
+        if (!ds) return '--';
+        try {
+          return new Date(ds).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        } catch {
+          return ds;
+        }
+      };
+      return `${f(start)} - ${f(end)}`;
+    }
+
+    function calculateDuration(startStr, endStr) {
+      const start = startStr ? new Date(startStr) : null;
+      const end = endStr ? new Date(endStr) : null;
+      if (!start || !end || isNaN(start) || isNaN(end)) return '--';
+      
+      const diffTime = Math.abs(end - start);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return `${diffDays} days`;
+    }
+
+    function setStatusChip(status) {
+      const chip = document.getElementById('projectStatusChip');
+      if (!chip) return;
+      const s = (status || '').toLowerCase();
+      let cls = 'bg-emerald-500/10 text-emerald-700', text = 'On Time';
+      if (s.includes('complete')) { cls = 'bg-blue-500/10 text-blue-700'; text = 'Completed'; }
+      else if (s.includes('critical')) { cls = 'bg-rose-500/10 text-rose-700'; text = 'Critical'; }
+      else if (s.includes('delay')) { cls = 'bg-amber-500/10 text-amber-700'; text = 'Delayed'; }
+      chip.className = `px-6 py-3 rounded-2xl text-sm font-semibold inline-block ${cls}`;
+      chip.textContent = text;
+    }
+
+    function animateCircle(circleId, labelId, p) {
+      const c = document.getElementById(circleId), l = document.getElementById(labelId);
+      const r = 70, C = 2 * Math.PI * r;
+      const target = Math.max(0, Math.min(100, p || 0));
+      const offset = C - (target / 100) * C;
+      if (c) c.style.strokeDashoffset = offset;
+      if (l) l.textContent = target + '%';
+    }
+
+    // Manager Dashboard Functions
+    function loadManagerData() {
+      google.script.run
+        .withFailureHandler(err => alert('Error loading manager data: ' + (err?.message || err)))
+        .withSuccessHandler(data => {
+          if (!data || !data.ok) { alert('Failed to load manager data'); return; }
+          _managerData = data;
+          renderManagerDashboard(data);
+        })
+        .getManagerDashboard();
+    }
+
+    function renderManagerDashboard(data) {
+      const projects = data.projects || [];
+      const totals = data.totals || {};
+      
+      // Update quick stats
+      setTxt('totalProjectsCount', projects.length);
+      setTxt('avgProgressValue', (totals.avgProgress || 0) + '%');
+      setTxt('totalValueAmount', formatCurrency(totals.totalValue || 0));
+      
+      // Calculate active teams
+      const teams = new Set();
+      projects.forEach(p => {
+        if (p.teamLeader) teams.add(p.teamLeader);
+      });
+      setTxt('activeTeamsCount', teams.size);
+      
+      // Render charts
+      renderProgressChart(projects);
+      renderStatusChart(projects);
+      renderTeamPerformance(projects);
+      
+      // Render projects grid
+      renderProjectsGrid(projects);
+      
+      // Setup team filter
+      setupTeamFilter(projects);
+    }
+
+    function renderProgressChart(projects) {
+      const ctx = document.getElementById('progressChart').getContext('2d');
+      
+      if (_charts.progressChart) {
+        _charts.progressChart.destroy();
+      }
+      
+      const progressRanges = {
+        '0-25%': 0,
+        '26-50%': 0,
+        '51-75%': 0,
+        '76-100%': 0
+      };
+      
+      projects.forEach(p => {
+        const progress = p.progress || 0;
+        if (progress <= 25) progressRanges['0-25%']++;
+        else if (progress <= 50) progressRanges['26-50%']++;
+        else if (progress <= 75) progressRanges['51-75%']++;
+        else progressRanges['76-100%']++;
+      });
+      
+      _charts.progressChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(progressRanges),
+          datasets: [{
+            data: Object.values(progressRanges),
+            backgroundColor: [
+              '#ef4444',
+              '#f59e0b',
+              '#3b82f6',
+              '#10b981'
+            ],
+            borderWidth: 2,
+            borderColor: '#fff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom'
+            },
+            title: {
+              display: true,
+              text: 'Projects by Progress Range'
+            }
+          }
+        }
+      });
+    }
+
+    function renderStatusChart(projects) {
+      const ctx = document.getElementById('statusChart').getContext('2d');
+      
+      if (_charts.statusChart) {
+        _charts.statusChart.destroy();
+      }
+      
+      const statusCounts = {
+        'On Time': 0,
+        'Delayed': 0,
+        'Critical': 0,
+        'Completed': 0
+      };
+      
+      projects.forEach(p => {
+        const status = statusKey(p.status);
+        statusCounts[status === 'on-time' ? 'On Time' : 
+                     status === 'delayed' ? 'Delayed' :
+                     status === 'critical' ? 'Critical' : 'Completed']++;
+      });
+      
+      _charts.statusChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(statusCounts),
+          datasets: [{
+            label: 'Number of Projects',
+            data: Object.values(statusCounts),
+            backgroundColor: [
+              '#10b981',
+              '#f59e0b',
+              '#ef4444',
+              '#3b82f6'
+            ],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            title: {
+              display: true,
+              text: 'Projects by Status'
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                stepSize: 1
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function renderTeamPerformance(projects) {
+      const ctx = document.getElementById('teamChart').getContext('2d');
+      const teamStatsContainer = document.getElementById('teamStats');
+      
+      // Calculate team statistics
+      const teamStats = {};
+      projects.forEach(p => {
+        const leader = p.teamLeader || 'Unassigned';
+        if (!teamStats[leader]) {
+          teamStats[leader] = {
+            count: 0,
+            totalProgress: 0,
+            totalValue: 0,
+            statuses: {}
+          };
+        }
+        
+        teamStats[leader].count++;
+        teamStats[leader].totalProgress += (p.progress || 0);
+        teamStats[leader].totalValue += (p.value || 0);
+        
+        const status = statusKey(p.status);
+        teamStats[leader].statuses[status] = (teamStats[leader].statuses[status] || 0) + 1;
+      });
+      
+      // Render team stats cards
+      teamStatsContainer.innerHTML = Object.entries(teamStats).map(([leader, stats]) => {
+        const avgProgress = Math.round(stats.totalProgress / stats.count);
+        return `
+          <div class="bg-gradient-to-br from-purple-50 to-indigo-100 rounded-xl p-4 border cursor-pointer hover:shadow-lg transition-all duration-300" onclick="viewTeamDetails('${leader}')">
+            <h4 class="font-bold text-gray-900 text-lg mb-2">${leader}</h4>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-gray-600">Projects:</span>
+                <span class="font-semibold">${stats.count}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Avg Progress:</span>
+                <span class="font-semibold text-green-600">${avgProgress}%</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Total Value:</span>
+                <span class="font-semibold">${formatCurrency(stats.totalValue)}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      // Render team chart
+      if (_charts.teamChart) {
+        _charts.teamChart.destroy();
+      }
+      
+      const teamNames = Object.keys(teamStats);
+      const teamProgress = teamNames.map(leader => Math.round(teamStats[leader].totalProgress / teamStats[leader].count));
+      
+      _charts.teamChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: teamNames,
+          datasets: [{
+            label: 'Average Progress %',
+            data: teamProgress,
+            backgroundColor: '#8b5cf6',
+            borderColor: '#7c3aed',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Team Performance (Average Progress)'
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 100,
+              ticks: {
+                callback: function(value) {
+                  return value + '%';
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function renderProjectsGrid(projects) {
+      const grid = document.getElementById('projectsGrid');
+      
+      grid.innerHTML = projects.map(p => {
+        const status = statusKey(p.status);
+        const statusColors = {
+          'on-time': 'bg-emerald-100 text-emerald-700',
+          'delayed': 'bg-amber-100 text-amber-700',
+          'critical': 'bg-rose-100 text-rose-700',
+          'completed': 'bg-blue-100 text-blue-700'
+        };
+        
+        return `
+          <div class="bg-white rounded-xl shadow-lg p-6 border card-hover cursor-pointer" onclick="openProjectDetail('${p.sd06Code}')">
+            <div class="flex justify-between items-start mb-4">
+              <div class="flex-1">
+                <h4 class="font-bold text-gray-900 text-lg truncate">${p.client || 'Unnamed Project'}</h4>
+                <p class="text-sm text-gray-600 truncate">${p.compound || 'No Location'}</p>
+                <p class="text-xs text-gray-500 mt-1">SD06: ${p.sd06Code || '--'}</p>
+              </div>
+              <div class="px-3 py-1 rounded-full text-xs font-medium ${statusColors[status]}">
+                ${p.status || 'On Time'}
+              </div>
+            </div>
+            
+            <div class="mb-4">
+              <div class="flex justify-between text-sm mb-2">
+                <span class="text-gray-600">Progress</span>
+                <span class="font-semibold">${p.progress || 0}%</span>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full h-3">
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all duration-500" style="width:${p.progress || 0}%"></div>
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 text-sm mb-4">
+              <div>
+                <p class="text-gray-600">Phase</p>
+                <p class="font-semibold">${p.phase || 'Phase 1'}</p>
+              </div>
+              <div>
+                <p class="text-gray-600">Team Lead</p>
+                <p class="font-semibold truncate">${p.teamLeader || '--'}</p>
+              </div>
+            </div>
+            
+            <div class="flex gap-2">
+              <button class="flex-1 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-sm font-medium" onclick="event.stopPropagation(); openProjectDetail('${p.sd06Code}')">
+                View Details
+              </button>
+              <button class="px-3 py-2 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium" onclick="event.stopPropagation(); quickActions('${p.sd06Code}')">
+                Actions
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setupTeamFilter(projects) {
+      const teamFilter = document.getElementById('teamFilter');
+      const teams = new Set();
+      
+      projects.forEach(p => {
+        if (p.teamLeader) teams.add(p.teamLeader);
+      });
+      
+      teamFilter.innerHTML = '<option value="all">All Teams</option>' + 
+        Array.from(teams).map(team => `<option value="${team}">${team}</option>`).join('');
+      
+      teamFilter.addEventListener('change', filterProjects);
+      document.getElementById('statusFilter').addEventListener('change', filterProjects);
+      document.getElementById('phaseFilter').addEventListener('change', filterProjects);
+      document.getElementById('projectSearch').addEventListener('input', filterProjects);
+    }
+
+    function filterProjects() {
+      if (!_managerData) return;
+      
+      const statusFilter = document.getElementById('statusFilter').value;
+      const phaseFilter = document.getElementById('phaseFilter').value;
+      const teamFilter = document.getElementById('teamFilter').value;
+      const searchQuery = document.getElementById('projectSearch').value.toLowerCase();
+      
+      const filtered = _managerData.projects.filter(p => {
+        const matchesStatus = statusFilter === 'all' || statusKey(p.status) === statusFilter;
+        const matchesPhase = phaseFilter === 'all' || (p.phase || 'Phase 1') === phaseFilter;
+        const matchesTeam = teamFilter === 'all' || p.teamLeader === teamFilter;
+        const matchesSearch = !searchQuery || 
+          (p.client || '').toLowerCase().includes(searchQuery) ||
+          (p.compound || '').toLowerCase().includes(searchQuery) ||
+          (p.sd06Code || '').toLowerCase().includes(searchQuery);
+        
+        return matchesStatus && matchesPhase && matchesTeam && matchesSearch;
+      });
+      
+      renderProjectsGrid(filtered);
+    }
+
+    // Modal functions
+    function openProjectDetail(sd06Code) {
+      const project = _managerData.projects.find(p => p.sd06Code === sd06Code);
+      if (!project) return;
+      
+      document.getElementById('projectDetailTitle').textContent = `Project Details - ${project.client}`;
+      
+      const content = document.getElementById('projectDetailContent');
+      content.innerHTML = `
+        <div class="grid md:grid-cols-2 gap-6">
+          <div class="space-y-4">
+            <h4 class="font-bold text-gray-900 text-lg">Basic Information</h4>
+            <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+              <div class="flex justify-between"><span>Client:</span><span class="font-semibold">${project.client}</span></div>
+              <div class="flex justify-between"><span>Compound:</span><span class="font-semibold">${project.compound}</span></div>
+              <div class="flex justify-between"><span>SD06 Code:</span><span class="font-semibold">${project.sd06Code}</span></div>
+              <div class="flex justify-between"><span>Phase:</span><span class="font-semibold">${project.phase}</span></div>
+            </div>
+          </div>
+          
+          <div class="space-y-4">
+            <h4 class="font-bold text-gray-900 text-lg">Progress & Status</h4>
+            <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+              <div class="flex justify-between"><span>Execution Progress:</span><span class="font-semibold text-green-600">${project.progress}%</span></div>
+              <div class="flex justify-between"><span>Status:</span><span class="font-semibold">${project.status}</span></div>
+              <div class="flex justify-between"><span>Team Leader:</span><span class="font-semibold">${project.teamLeader || '--'}</span></div>
+              <div class="flex justify-between"><span>Site Manager:</span><span class="font-semibold">${project.siteManager || '--'}</span></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="grid md:grid-cols-2 gap-6">
+          <div class="space-y-4">
+            <h4 class="font-bold text-gray-900 text-lg">Financial Information</h4>
+            <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+              <div class="flex justify-between"><span>Contract Value:</span><span class="font-semibold">${formatCurrency(project.value)}</span></div>
+              <div class="flex justify-between"><span>Amount Paid:</span><span class="font-semibold text-green-600">${formatCurrency(project.paid)}</span></div>
+              <div class="flex justify-between"><span>Pending:</span><span class="font-semibold text-amber-600">${formatCurrency(project.value - project.paid)}</span></div>
+            </div>
+          </div>
+          
+          <div class="space-y-4">
+            <h4 class="font-bold text-gray-900 text-lg">Timeline</h4>
+            <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+              <div class="flex justify-between"><span>Start Date:</span><span class="font-semibold">${project.startDate}</span></div>
+              <div class="flex justify-between"><span>End Date:</span><span class="font-semibold">${project.endDate}</span></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="flex gap-3 pt-4 border-t">
+          <button onclick="generateProjectReport('${sd06Code}')" class="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            Generate Report
+          </button>
+          <button onclick="closeProjectDetailModal()" class="py-2 px-4 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
+            Close
+          </button>
+        </div>
+      `;
+      
+      document.getElementById('projectDetailModal').classList.remove('hidden');
+      document.getElementById('projectDetailModal').classList.add('flex');
+    }
+
+    function closeProjectDetailModal() {
+      document.getElementById('projectDetailModal').classList.add('hidden');
+      document.getElementById('projectDetailModal').classList.remove('flex');
+    }
+
+    function viewTeamDetails(teamLeader) {
+      const teamProjects = _managerData.projects.filter(p => p.teamLeader === teamLeader);
+      const totalProjects = teamProjects.length;
+      const avgProgress = totalProjects ? Math.round(teamProjects.reduce((sum, p) => sum + (p.progress || 0), 0) / totalProjects) : 0;
+      const totalValue = teamProjects.reduce((sum, p) => sum + (p.value || 0), 0);
+      
+      document.getElementById('teamAnalyticsContent').innerHTML = `
+        <div class="bg-gradient-to-br from-purple-600 to-indigo-700 text-white rounded-2xl p-6 mb-6">
+          <h4 class="text-2xl font-bold mb-2">${teamLeader}</h4>
+          <p class="opacity-90">Team Performance Analytics</p>
+        </div>
+        
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div class="bg-white p-4 rounded-lg border text-center">
+            <div class="text-2xl font-bold text-purple-600">${totalProjects}</div>
+            <div class="text-sm text-gray-600">Total Projects</div>
+          </div>
+          <div class="bg-white p-4 rounded-lg border text-center">
+            <div class="text-2xl font-bold text-green-600">${avgProgress}%</div>
+            <div class="text-sm text-gray-600">Avg Progress</div>
+          </div>
+          <div class="bg-white p-4 rounded-lg border text-center">
+            <div class="text-2xl font-bold text-blue-600">${formatCurrency(totalValue)}</div>
+            <div class="text-sm text-gray-600">Total Value</div>
+          </div>
+          <div class="bg-white p-4 rounded-lg border text-center">
+            <div class="text-2xl font-bold text-amber-600">${Math.round(totalValue / totalProjects) || 0}</div>
+            <div class="text-sm text-gray-600">Avg Value/Project</div>
+          </div>
+        </div>
+        
+        <h5 class="font-bold text-gray-900 mb-4">Team Projects</h5>
+        <div class="space-y-3 max-h-96 overflow-y-auto">
+          ${teamProjects.map(p => `
+            <div class="bg-gray-50 p-4 rounded-lg border">
+              <div class="flex justify-between items-center mb-2">
+                <span class="font-semibold">${p.client}</span>
+                <span class="text-sm ${p.progress >= 80 ? 'text-green-600' : p.progress >= 50 ? 'text-amber-600' : 'text-red-600'}">${p.progress}%</span>
+              </div>
+              <div class="flex justify-between text-sm text-gray-600">
+                <span>${p.compound}</span>
+                <span>${p.phase}</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      
+      document.getElementById('teamAnalyticsModal').classList.remove('hidden');
+      document.getElementById('teamAnalyticsModal').classList.add('flex');
+    }
+
+    function closeTeamAnalyticsModal() {
+      document.getElementById('teamAnalyticsModal').classList.add('hidden');
+      document.getElementById('teamAnalyticsModal').classList.remove('flex');
+    }
+
+    // Action functions
+    function refreshManagerData() {
+      loadManagerData();
+    }
+
+    function generatePerformanceReport() {
+      alert('Performance report generation started...');
+      // Implementation would go here
+    }
+
+    function viewTeamAnalytics() {
+      alert('Opening team analytics dashboard...');
+      // Implementation would go here
+    }
+
+    function financialOverview() {
+      alert('Displaying financial overview...');
+      // Implementation would go here
+    }
+
+    function criticalAlerts() {
+      const criticalProjects = _managerData.projects.filter(p => statusKey(p.status) === 'critical');
+      if (criticalProjects.length === 0) {
+        alert('🎉 No critical projects found! All projects are running smoothly.');
+      } else {
+        const alertMessage = `🚨 CRITICAL ALERTS\n\n${criticalProjects.length} project(s) need immediate attention:\n\n` +
+          criticalProjects.map(p => `• ${p.client} - ${p.compound} (${p.progress}%)`).join('\n');
+        alert(alertMessage);
+      }
+    }
+
+    function exportToExcel() {
+      google.script.run
+        .withSuccessHandler(result => {
+          if (result && result.ok) {
+            alert('Export successful!');
+            window.open(result.url, '_blank');
+          } else {
+            alert('Export failed: ' + (result?.error || 'Unknown error'));
+          }
+        })
+        .exportProjectsToExcel();
+    }
+
+    function quickActions(sd06Code) {
+      alert(`Quick actions for project ${sd06Code}`);
+      // Implementation would go here
+    }
+
+    function generateProjectReport(sd06Code) {
+      alert(`Generating report for project ${sd06Code}`);
+      // Implementation would go here
+    }
+  <script src="script.js"></script>
+
 </body>
 </html>
