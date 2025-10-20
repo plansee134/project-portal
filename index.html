@@ -579,7 +579,33 @@
       } catch (e) {}
     })();
 
-    document.getElementById('loginForm').addEventListener('submit', e => {
+    document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value.trim();
+  const remember = document.getElementById('rememberMe').checked;
+
+  // 🔗 رابط الـ API بتاعك (backend)
+  const API_URL = "https://script.google.com/macros/s/AKfycbwr7diNkeMZNT20-oUMUKpg10VONosrIZbsXimKxx-LPaD1GkdK5rGGEuyJbvxKYw2W/exec";
+
+  try {
+    // 📡 إرسال البيانات للـ backend
+    const response = await fetch(`${API_URL}?action=authenticate&username=${encodeURIComponent(u)}&password=${encodeURIComponent(p)}`);
+    const res = await response.json();
+
+    // ✅ لو رجع login ناجح
+    if (res.ok) {
+      onAuth(res, remember, { u: btoa(u), p: btoa(p) });
+    } else {
+      alert(res.error || "Login failed. Please check your credentials.");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Network error, please try again later.");
+  }
+});
+
       e.preventDefault();
       const u = document.getElementById('username').value.trim();
       const p = document.getElementById('password').value.trim();
