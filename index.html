@@ -45,6 +45,8 @@
     .performance-card{background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%);}
     .financial-card{background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);}
     .team-card{background:linear-gradient(135deg,#43e97b 0%,#38f9d7 100%);}
+    .contact-card{cursor:pointer;transition:all 0.3s ease;}
+    .contact-card:hover{transform:translateY(-2px); box-shadow:0 8px 16px rgba(0,0,0,0.1);}
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen font-en">
@@ -240,20 +242,19 @@
               </div>
               <div>
                 <h3 class="text-2xl font-bold text-gray-900">Project Timeline - <span id="currentPhaseLabel">Phase 1</span></h3>
-                <p class="text-sm text-gray-600">Execution Progress (Gantt Chart)</p>
+                <p class="text-sm text-gray-600">Enhanced Gantt Chart View</p>
               </div>
             </div>
             
-            <!-- Gantt Chart -->
+            <!-- Enhanced Gantt Chart -->
             <div class="gantt-chart">
               <div class="flex items-center gap-6 mb-6 justify-center">
                 <div class="flex items-center gap-2"><div class="w-4 h-4 bg-blue-500 rounded-full"></div><span class="text-sm font-medium text-gray-700">Planned</span></div>
                 <div class="flex items-center gap-2"><div class="w-4 h-4 bg-green-500 rounded-full"></div><span class="text-sm font-medium text-gray-700">Actual</span></div>
-                <div class="flex items-center gap-2"><div class="w-4 h-4 bg-red-500 rounded-full"></div><span class="text-sm font-medium text-gray-700">Milestones</span></div>
               </div>
               
               <div id="ganttContainer" class="space-y-4">
-                <!-- Gantt tasks will be dynamically generated here -->
+                <!-- Gantt chart will be dynamically generated here -->
               </div>
               
               <div class="gantt-timeline" id="ganttTimeline">
@@ -299,6 +300,7 @@
               </div>
               <h4 id="teamLeaderName" class="font-bold text-gray-900 mb-2 text-lg">--</h4>
               <p class="text-sm text-blue-600 font-medium">Engineering Team Leader</p>
+              <p class="text-xs text-gray-500 mt-1">From Execution Sheet</p>
             </div>
             <div class="text-center p-6 bg-gradient-to-br from-green-50 to-emerald-100 rounded-2xl border shadow-sm">
               <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -307,21 +309,21 @@
               <h4 id="siteManagerName" class="font-bold text-gray-900 mb-2 text-lg">--</h4>
               <p class="text-sm text-green-600 font-medium">Site Manager</p>
             </div>
-            <div class="text-center p-6 bg-gradient-to-br from-purple-50 to-violet-100 rounded-2xl border shadow-sm">
+            <div class="text-center p-6 bg-gradient-to-br from-purple-50 to-violet-100 rounded-2xl border shadow-sm contact-card" onclick="showContactInfo('teamLeader')">
               <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-violet-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
               </div>
               <h4 id="teamLeaderNameTeam" class="font-bold text-gray-900 mb-2 text-lg">--</h4>
               <p class="text-sm text-purple-600 font-medium">Team Leader</p>
-              <div class="text-center p-6 bg-gradient-to-br from-purple-50 to-violet-100 rounded-2xl border shadow-sm cursor-pointer" onclick="teamLeaderContact()">
+              <p class="text-xs text-gray-500 mt-1">From SD06 Sheet • Click for contact</p>
             </div>
-            <div class="text-center p-6 bg-gradient-to-br from-orange-50 to-amber-100 rounded-2xl border shadow-sm">
-              <div class="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-600 rounded-full flex items around justify-center mx-auto mb-4">
+            <div class="text-center p-6 bg-gradient-to-br from-orange-50 to-amber-100 rounded-2xl border shadow-sm contact-card" onclick="showContactInfo('accountManager')">
+              <div class="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z"/></svg>
               </div>
               <h4 id="accountManagerNameTeam" class="font-bold text-gray-900 mb-2 text-lg">--</h4>
               <p class="text-sm text-orange-600 font-medium">Account Manager</p>
-              <div class="text-center p-6 bg-gradient-to-br from-orange-50 to-amber-100 rounded-2xl border shadow-sm cursor-pointer" onclick="accountManagerContact()">
+              <p class="text-xs text-gray-500 mt-1">Click for contact</p>
             </div>
           </div>
         </div>
