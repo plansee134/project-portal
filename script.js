@@ -5,14 +5,14 @@
  ******************************************************/
 
 // ============= CONFIG ===================
-const API_URL = "https://script.google.com/macros/s/AKfycby087sNawrfe529w2aToIz6BA6guVWaCYau90mYQZInvA7lN8kVMSyVW60KLOdUyFU7/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyvG9r3cuyUL7D7xbdiiWPNj8tSGiwcS5Wyip7Bns5SOLc4KRDJJGVH8Zw9672dBY1o/exec";
 
 // ============= STATE ====================
 let _managerData = null;
 let _currentAuth = null;
 let _charts = {};
 let currentUnits = [];
-let contactData = {}; // لتخزين بيانات الاتصال
+let contactData = {};
 
 // ============= UTILITY FUNCTIONS ====================
 const clampPct = v => { 
@@ -66,8 +66,12 @@ async function apiCall(action, params = {}) {
             ...params
         });
         
+        console.log('API Call:', action, params);
+        
         const response = await fetch(`${API_URL}?${urlParams}`);
         const data = await response.json();
+        
+        console.log('API Response:', action, data);
         return data;
     } catch (error) {
         console.error('API call failed:', error);
@@ -109,7 +113,9 @@ async function getContactData() {
             const u = atob(saved.u), p = atob(saved.p);
             authenticate(u, p).then(res => onAuth(res, true, saved));
         }
-    } catch (e) {}
+    } catch (e) {
+        console.log('No saved credentials found');
+    }
 })();
 
 document.getElementById('loginForm').addEventListener('submit', async e => {
@@ -119,20 +125,27 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
     const p = document.getElementById('password').value.trim();
     const remember = document.getElementById('rememberMe').checked;
     
+    showLoading('Signing in...');
     const res = await authenticate(u, p);
     onAuth(res, remember, { u: btoa(u), p: btoa(p) });
 });
 
 async function onAuth(res, remember, creds) {
+    hideLoading();
+    
     if (!res || !res.ok) { 
         alert(res?.error || 'Login failed'); 
         return; 
     }
     
-    // جلب بيانات الاتصال أولاً
+    // Load contact data first
+    console.log('Loading contact data...');
     const contactRes = await getContactData();
     if (contactRes.ok) {
         contactData = contactRes.contacts || {};
+        console.log('Contact data loaded:', Object.keys(contactData).length, 'contacts');
+    } else {
+        console.log('Failed to load contact data');
     }
     
     document.getElementById('loginScreen').classList.add('hidden');
@@ -236,7 +249,10 @@ function switchUnit(sd06Code) {
 
 async function safeLoadUnit(sd06Code) {
     try {
+        showLoading('Loading unit data...');
         const data = await getClientReport(sd06Code);
+        hideLoading();
+        
         if (!data.ok) {
             alert('Error loading unit data: ' + (data?.error || 'Unknown error'));
             return;
@@ -244,6 +260,7 @@ async function safeLoadUnit(sd06Code) {
         renderClient(data);
         document.getElementById('unitContent').classList.add('fade-in');
     } catch (error) {
+        hideLoading();
         alert('Error loading unit data: ' + error.message);
         document.getElementById('unitContent').classList.add('fade-in');
     }
@@ -254,6 +271,8 @@ function renderClient(d) {
         alert('Client data not found'); 
         return; 
     }
+    
+    console.log('Rendering client data:', d);
     
     const u = d.unit || {};
     const design = d.design || {};
@@ -314,7 +333,7 @@ function renderClient(d) {
     // Work Progress Breakdown
     renderWorkProgress(ex.work || {}, currentPhase);
 
-    // Team Information - التعديل الجديد لفصل Engineering Team Leader عن Team Leader
+    // Team Information
     const team = ex.team || {};
     
     // Engineering Team Leader (من Execution)
@@ -490,7 +509,7 @@ function showContactInfo(name, role) {
         }
     }
     
-    // إذا لم يتم العثور بعد، ابحث في كل المفاتيج
+    // إذا لم يتم العثور بعد، ابحث في كل المفاتيح
     if (!phoneNumber) {
         for (const [contactName, number] of Object.entries(contactData)) {
             if (name.toLowerCase().includes(contactName.toLowerCase()) || 
@@ -640,35 +659,37 @@ function animateCircle(circleId, labelId, p) {
     if (c) c.style.strokeDashoffset = offset;
     if (l) l.textContent = target + '%';
 }
-// ============= DEBUG FUNCTION ====================
-function debugContacts() {
-    console.log('=== DEBUG CONTACTS ===');
-    console.log('Contact data:', contactData);
-    console.log('Team Leader:', document.getElementById('teamLeaderNameTeam')?.textContent);
-    console.log('Account Manager:', document.getElementById('accountManagerNameTeam')?.textContent);
-}
-
-// استدعاء الدالة للتحقق بعد تحميل الصفحة
-setTimeout(debugContacts, 2000);
 
 // ============= MANAGER DASHBOARD FUNCTIONS ====================
 async function loadManagerData() {
     try {
+        showLoading('Loading manager dashboard...');
         const data = await getManagerDashboard();
+        
+        console.log('Manager dashboard data:', data);
+        
         if (!data || !data.ok) { 
-            alert('Failed to load manager data'); 
+            alert('Failed to load manager data: ' + (data?.error || 'Unknown error')); 
+            hideLoading();
             return; 
         }
+        
         _managerData = data;
         renderManagerDashboard(data);
+        hideLoading();
     } catch (error) {
+        console.error('Error loading manager data:', error);
         alert('Error loading manager data: ' + error.message);
+        hideLoading();
     }
 }
 
 function renderManagerDashboard(data) {
+    console.log('Rendering manager dashboard:', data);
+    
     const projects = data.projects || [];
     const totals = data.totals || {};
+    const teamLeaders = data.teamLeaders || [];
     
     // Update quick stats
     setTxt('totalProjectsCount', projects.length);
@@ -678,27 +699,297 @@ function renderManagerDashboard(data) {
     // Calculate active teams
     const teams = new Set();
     projects.forEach(p => {
-        if (p.teamLeader) teams.add(p.teamLeader);
+        if (p.teamLeader && p.teamLeader !== '--' && p.teamLeader !== 'Unassigned') {
+            teams.add(p.teamLeader);
+        }
     });
     setTxt('activeTeamsCount', teams.size);
+    
+    // Render projects grid
+    renderProjectsGrid(projects);
+    
+    // Render team performance
+    renderTeamPerformance(teamLeaders);
     
     // Render charts
     renderProgressChart(projects);
     renderStatusChart(projects);
-    renderTeamPerformance(projects);
-    
-    // Render projects grid
-    renderProjectsGrid(projects);
     
     // Setup team filter
     setupTeamFilter(projects);
 }
 
-// ... باقي دوال ال manager dashboard تبقى كما هي بدون تغيير ...
-// [يتبع نفس الكود السابق للـ Manager Dashboard]
+function renderProjectsGrid(projects) {
+    const grid = document.getElementById('projectsGrid');
+    if (!grid) return;
+    
+    if (projects.length === 0) {
+        grid.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No projects found</div>';
+        return;
+    }
+    
+    grid.innerHTML = projects.map(project => {
+        const status = statusKey(project.status);
+        const statusColors = {
+            'completed': 'bg-green-100 text-green-800',
+            'critical': 'bg-red-100 text-red-800', 
+            'delayed': 'bg-amber-100 text-amber-800',
+            'on-time': 'bg-blue-100 text-blue-800'
+        };
+        
+        return `
+        <div class="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-all duration-300">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h3 class="font-bold text-lg text-gray-900">${project.client || 'Unknown Client'}</h3>
+                    <p class="text-gray-600 text-sm">${project.compound || 'No Compound'}</p>
+                </div>
+                <span class="px-3 py-1 rounded-full text-xs font-semibold ${statusColors[status] || 'bg-gray-100 text-gray-800'}">
+                    ${project.status || 'Unknown'}
+                </span>
+            </div>
+            
+            <div class="space-y-3 mb-4">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-600">Progress</span>
+                    <span class="font-semibold">${project.progress || 0}%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="h-2 rounded-full bg-green-500 transition-all duration-500" 
+                         style="width: ${project.progress || 0}%"></div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <div class="text-gray-600">Value</div>
+                    <div class="font-semibold">${formatCurrency(project.value)}</div>
+                </div>
+                <div>
+                    <div class="text-gray-600">Phase</div>
+                    <div class="font-semibold">${project.phase || '--'}</div>
+                </div>
+            </div>
+            
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-600">${project.teamLeader || 'No Team Leader'}</span>
+                    <button onclick="openProjectDetail('${project.sd06Code}')" 
+                            class="text-blue-600 hover:text-blue-800 font-medium">
+                        View Details
+                    </button>
+                </div>
+            </div>
+        </div>
+        `;
+    }).join('');
+}
+
+function renderTeamPerformance(teamLeaders) {
+    const container = document.getElementById('teamPerformanceGrid');
+    if (!container) {
+        console.log('Team performance container not found');
+        return;
+    }
+    
+    if (teamLeaders.length === 0) {
+        container.innerHTML = '<div class="text-center py-4 text-gray-500">No team data available</div>';
+        return;
+    }
+    
+    container.innerHTML = teamLeaders.map(team => `
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <div class="flex justify-between items-start mb-4">
+                <h4 class="font-bold text-gray-900">${team.name}</h4>
+                <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
+                    ${team.projectCount} projects
+                </span>
+            </div>
+            
+            <div class="space-y-3">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-600">Avg Progress</span>
+                    <span class="font-semibold">${team.avgProgress || 0}%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="h-2 rounded-full bg-green-500" 
+                         style="width: ${team.avgProgress || 0}%"></div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 text-sm mt-4">
+                    <div>
+                        <div class="text-gray-600">Completed</div>
+                        <div class="font-semibold text-green-600">${team.completedCount || 0}</div>
+                    </div>
+                    <div>
+                        <div class="text-gray-600">Delayed</div>
+                        <div class="font-semibold text-amber-600">${team.delayedCount || 0}</div>
+                    </div>
+                </div>
+                
+                <button onclick="viewTeamDetails('${team.name}')" 
+                        class="w-full mt-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+                    View Team Details
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderProgressChart(projects) {
+    const ctx = document.getElementById('progressChart');
+    if (!ctx) return;
+    
+    if (_charts.progressChart) {
+        _charts.progressChart.destroy();
+    }
+    
+    const progressRanges = {
+        '0-20%': 0,
+        '21-40%': 0,
+        '41-60%': 0,
+        '61-80%': 0,
+        '81-100%': 0
+    };
+    
+    projects.forEach(project => {
+        const progress = project.progress || 0;
+        if (progress <= 20) progressRanges['0-20%']++;
+        else if (progress <= 40) progressRanges['21-40%']++;
+        else if (progress <= 60) progressRanges['41-60%']++;
+        else if (progress <= 80) progressRanges['61-80%']++;
+        else progressRanges['81-100%']++;
+    });
+    
+    _charts.progressChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(progressRanges),
+            datasets: [{
+                label: 'Number of Projects',
+                data: Object.values(progressRanges),
+                backgroundColor: [
+                    '#ef4444',
+                    '#f97316',
+                    '#eab308',
+                    '#84cc16',
+                    '#22c55e'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                title: {
+                    display: true,
+                    text: 'Projects by Progress Range'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderStatusChart(projects) {
+    const ctx = document.getElementById('statusChart');
+    if (!ctx) return;
+    
+    if (_charts.statusChart) {
+        _charts.statusChart.destroy();
+    }
+    
+    const statusCounts = {
+        'On Time': 0,
+        'Delayed': 0,
+        'Critical': 0,
+        'Completed': 0
+    };
+    
+    projects.forEach(project => {
+        const status = statusKey(project.status);
+        statusCounts[status]++;
+    });
+    
+    _charts.statusChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(statusCounts),
+            datasets: [{
+                data: Object.values(statusCounts),
+                backgroundColor: [
+                    '#3b82f6',
+                    '#f59e0b',
+                    '#ef4444',
+                    '#10b981'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+function setupTeamFilter(projects) {
+    const filter = document.getElementById('teamFilter');
+    if (!filter) return;
+    
+    const teams = new Set();
+    projects.forEach(p => {
+        if (p.teamLeader && p.teamLeader !== '--' && p.teamLeader !== 'Unassigned') {
+            teams.add(p.teamLeader);
+        }
+    });
+    
+    filter.innerHTML = '<option value="all">All Teams</option>' + 
+        Array.from(teams).map(team => `<option value="${team}">${team}</option>`).join('');
+}
+
+// ============= LOADING FUNCTIONS ====================
+function showLoading(message = 'Loading...') {
+    let loader = document.getElementById('loadingOverlay');
+    if (!loader) {
+        loader = document.createElement('div');
+        loader.id = 'loadingOverlay';
+        loader.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        loader.innerHTML = `
+            <div class="bg-white rounded-lg p-6 flex items-center space-x-3">
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <span class="text-gray-700">${message}</span>
+            </div>
+        `;
+        document.body.appendChild(loader);
+    }
+}
+
+function hideLoading() {
+    const loader = document.getElementById('loadingOverlay');
+    if (loader) loader.remove();
+}
 
 // ============= MODAL FUNCTIONS ====================
 function openProjectDetail(sd06Code) {
+    if (!_managerData) return;
+    
     const project = _managerData.projects.find(p => p.sd06Code === sd06Code);
     if (!project) return;
     
@@ -767,6 +1058,8 @@ function closeProjectDetailModal() {
 }
 
 function viewTeamDetails(teamLeader) {
+    if (!_managerData) return;
+    
     const teamProjects = _managerData.projects.filter(p => p.teamLeader === teamLeader);
     const totalProjects = teamProjects.length;
     const avgProgress = totalProjects ? Math.round(teamProjects.reduce((sum, p) => sum + (p.progress || 0), 0) / totalProjects) : 0;
@@ -855,7 +1148,12 @@ function financialOverview() {
 }
 
 function criticalAlerts() {
-    const criticalProjects = _managerData ? _managerData.projects.filter(p => statusKey(p.status) === 'critical') : [];
+    if (!_managerData) {
+        alert('No data available');
+        return;
+    }
+    
+    const criticalProjects = _managerData.projects.filter(p => statusKey(p.status) === 'critical');
     if (criticalProjects.length === 0) {
         alert('🎉 No critical projects found! All projects are running smoothly.');
     } else {
@@ -871,4 +1169,8 @@ function quickActions(sd06Code) {
 
 function generateProjectReport(sd06Code) {
     alert(`Generating report for project ${sd06Code}`);
+}
+
+function viewDetailedAnalytics() {
+    alert('Opening detailed analytics dashboard...');
 }
