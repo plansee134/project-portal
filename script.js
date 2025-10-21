@@ -434,40 +434,86 @@ function renderEnhancedGanttChart(planned, actual) {
     `).join('');
 }
 
-// ============= CONTACT BUTTONS SETUP ====================
+// ============= CONTACT SYSTEM ====================
 function setupContactButtons(teamLeader, accountManager) {
-    // Team Leader Contact Button
-    const teamLeaderCard = document.querySelector('[onclick*="teamLeaderContact"]');
-    if (teamLeaderCard) {
-        teamLeaderCard.removeAttribute('onclick');
-        teamLeaderCard.style.cursor = 'pointer';
-        teamLeaderCard.onclick = () => showContactInfo(teamLeader, 'Team Leader');
+    console.log('Setting up contact buttons:', { teamLeader, accountManager });
+    console.log('Available contact data:', contactData);
+    
+    // Team Leader Contact
+    if (teamLeader && teamLeader !== '--') {
+        const teamLeaderCard = document.querySelector('#teamLeaderNameTeam').closest('.contact-card');
+        if (teamLeaderCard) {
+            teamLeaderCard.style.cursor = 'pointer';
+            teamLeaderCard.onclick = function() {
+                showContactInfo(teamLeader, 'Team Leader');
+            };
+            teamLeaderCard.title = `Click to contact ${teamLeader}`;
+        }
     }
     
-    // Account Manager Contact Button
-    const accountManagerCard = document.querySelector('[onclick*="accountManagerContact"]');
-    if (accountManagerCard) {
-        accountManagerCard.removeAttribute('onclick');
-        accountManagerCard.style.cursor = 'pointer';
-        accountManagerCard.onclick = () => showContactInfo(accountManager, 'Account Manager');
+    // Account Manager Contact
+    if (accountManager && accountManager !== '--') {
+        const accountManagerCard = document.querySelector('#accountManagerNameTeam').closest('.contact-card');
+        if (accountManagerCard) {
+            accountManagerCard.style.cursor = 'pointer';
+            accountManagerCard.onclick = function() {
+                showContactInfo(accountManager, 'Account Manager');
+            };
+            accountManagerCard.title = `Click to contact ${accountManager}`;
+        }
     }
 }
 
 function showContactInfo(name, role) {
+    console.log(`Contact clicked: ${role} - ${name}`);
+    console.log('Available contacts:', contactData);
+    
     if (!name || name === '--') {
         alert(`No ${role} assigned`);
         return;
     }
     
-    const phoneNumber = contactData[name];
+    // البحث عن الرقم في بيانات الاتصال
+    let phoneNumber = contactData[name];
+    
+    // إذا لم يتم العثور، جرب البحث بأجزاء من الاسم
+    if (!phoneNumber) {
+        const nameParts = name.split(' ');
+        for (const part of nameParts) {
+            if (part.length > 2) {
+                phoneNumber = contactData[part];
+                if (phoneNumber) {
+                    console.log(`Found phone number by partial name: ${part} -> ${phoneNumber}`);
+                    break;
+                }
+            }
+        }
+    }
+    
+    // إذا لم يتم العثور بعد، ابحث في كل المفاتيج
+    if (!phoneNumber) {
+        for (const [contactName, number] of Object.entries(contactData)) {
+            if (name.toLowerCase().includes(contactName.toLowerCase()) || 
+                contactName.toLowerCase().includes(name.toLowerCase())) {
+                phoneNumber = number;
+                console.log(`Found phone number by similar name: ${contactName} -> ${phoneNumber}`);
+                break;
+            }
+        }
+    }
+    
     if (phoneNumber) {
         const message = `${role}: ${name}\nPhone: ${phoneNumber}\n\nDo you want to call or message?`;
         if (confirm(message)) {
-            // فتح تطبيق الهاتف
-            window.open(`tel:${phoneNumber}`, '_blank');
+            // تنظيف رقم الهاتف
+            const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
+            window.open(`tel:${cleanPhone}`, '_blank');
         }
     } else {
-        alert(`${role}: ${name}\nPhone number not available in contacts`);
+        const availableContacts = Object.keys(contactData).length > 0 ? 
+            `Available contacts: ${Object.keys(contactData).join(', ')}` : 
+            'No contacts available in database';
+        alert(`${role}: ${name}\nPhone number not found.\n\n${availableContacts}`);
     }
 }
 
@@ -594,6 +640,16 @@ function animateCircle(circleId, labelId, p) {
     if (c) c.style.strokeDashoffset = offset;
     if (l) l.textContent = target + '%';
 }
+// ============= DEBUG FUNCTION ====================
+function debugContacts() {
+    console.log('=== DEBUG CONTACTS ===');
+    console.log('Contact data:', contactData);
+    console.log('Team Leader:', document.getElementById('teamLeaderNameTeam')?.textContent);
+    console.log('Account Manager:', document.getElementById('accountManagerNameTeam')?.textContent);
+}
+
+// استدعاء الدالة للتحقق بعد تحميل الصفحة
+setTimeout(debugContacts, 2000);
 
 // ============= MANAGER DASHBOARD FUNCTIONS ====================
 async function loadManagerData() {
