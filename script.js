@@ -5,7 +5,7 @@
  ******************************************************/
 
 // ============= CONFIG ===================
-const API_URL = "https://script.google.com/macros/s/AKfycbyvG9r3cuyUL7D7xbdiiWPNj8tSGiwcS5Wyip7Bns5SOLc4KRDJJGVH8Zw9672dBY1o/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbzBdMGMzps7-hdjC1CcKu1ije5_Bs8NW8--ARhjkFzrzRzN56lRPLO15hhplHkmIvX0/exec";
 
 // ============= STATE ====================
 let _managerData = null;
