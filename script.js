@@ -287,13 +287,18 @@ function renderClient(d) {
     const hasExecutionData = ex && Object.keys(ex).length > 0;
     if (hasExecutionData) {
         setStatusChip(ex?.status);
-        setTxt('overallProgressText', ex?.overallProgress || '');
+        // إزالة "Progress:" من النص
+        const progressText = ex?.overallProgress || '';
+        // إزالة كلمة "Progress:" إذا كانت موجودة
+        const cleanProgressText = progressText.replace(/^Progress:\s*/i, '');
+        setTxt('overallProgressText', cleanProgressText);
     } else {
         document.getElementById('projectStatusChip').className = 'px-6 py-3 rounded-2xl text-sm font-semibold inline-block bg-blue-500/10 text-blue-700 mb-3';
         document.getElementById('projectStatusChip').textContent = 'IN PROGRESS';
         setTxt('overallProgressText', 'Project is currently in progress');
     }
 
+    // باقي الكود بدون تغيير...
     // Timeline - استخدام التنسيق الجديد للتاريخ
     const planned = timeline.planned || {};
     const actual = timeline.actual || {};
@@ -337,7 +342,6 @@ function renderClient(d) {
     // 3D View
     setup3D(d.view3D);
 }
-
 // ============= NEW DATE FORMAT FUNCTION ====================
 function formatDateNew(dateStr) {
     if (!dateStr || dateStr === '--') return '--';
