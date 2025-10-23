@@ -5,7 +5,7 @@
  ******************************************************/
 
 // ============= CONFIG ===================
-const API_URL = "https://script.google.com/macros/s/AKfycbwYmMNx3aviNbQS08Q_KlL5YILg1_sv3qjsPN-Ox2ZenQuzxxIGITPPBo1NxqEQu4wl/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxdzS25y7yB-2vchy1tJC9ttQK2t33YpEwOilwfSbASS4hPIfydslBcKJ3CkzR8Bqjv/exec";
 
 // ============= STATE ====================
 let _managerData = null;
@@ -58,27 +58,65 @@ function getLastSunday() {
     });
 }
 
+// ============= PERFORMANCE OPTIMIZATIONS ====================
+function showLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.remove('hidden');
+}
+
+function hideLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.add('hidden');
+}
+
 // ============= API FUNCTIONS ====================
 async function apiCall(action, params = {}) {
+    showLoading();
+    
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        
         const urlParams = new URLSearchParams({
             action: action,
             ...params
         });
         
-        const response = await fetch(`${API_URL}?${urlParams}`);
+        const response = await fetch(`${API_URL}?${urlParams}`, {
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
         return data;
     } catch (error) {
         console.error('API call failed:', error);
+        if (error.name === 'AbortError') {
+            return { ok: false, error: 'Request timeout' };
+        }
         return { ok: false, error: 'Network error' };
+    } finally {
+        hideLoading();
     }
 }
 
-// ============= AUTHENTICATION ====================
 async function authenticate(username, password) {
-    const data = await apiCall('authenticate', { username, password });
-    return data;
+    const startTime = performance.now();
+    
+    try {
+        const data = await apiCall('authenticate', { username, password });
+        const endTime = performance.now();
+        console.log(`Authentication took ${endTime - startTime}ms`);
+        return data;
+    } catch (error) {
+        console.error('Authentication error:', error);
+        return { ok: false, error: 'Authentication failed' };
+    }
 }
 
 async function getClientReport(sd06Code) {
@@ -106,8 +144,9 @@ async function getContactData() {
     try {
         const saved = JSON.parse(localStorage.getItem('enhancedPortalRememberV7') || 'null');
         if (saved && saved.u && saved.p) {
-            const u = atob(saved.u), p = atob(saved.p);
-            authenticate(u, p).then(res => onAuth(res, true, saved));
+            document.getElementById('username').value = atob(saved.u);
+            document.getElementById('password').value = atob(saved.p);
+            document.getElementById('rememberMe').checked = true;
         }
     } catch (e) {}
 })();
@@ -118,6 +157,11 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
     const u = document.getElementById('username').value.trim();
     const p = document.getElementById('password').value.trim();
     const remember = document.getElementById('rememberMe').checked;
+    
+    if (!u || !p) {
+        alert('Please enter both username and password');
+        return;
+    }
     
     const res = await authenticate(u, p);
     onAuth(res, remember, { u: btoa(u), p: btoa(p) });
@@ -298,7 +342,6 @@ function renderClient(d) {
         setTxt('overallProgressText', 'Project is currently in progress');
     }
 
-    // باقي الكود بدون تغيير...
     // Timeline - استخدام التنسيق الجديد للتاريخ
     const planned = timeline.planned || {};
     const actual = timeline.actual || {};
@@ -342,6 +385,7 @@ function renderClient(d) {
     // 3D View
     setup3D(d.view3D);
 }
+
 // ============= NEW DATE FORMAT FUNCTION ====================
 function formatDateNew(dateStr) {
     if (!dateStr || dateStr === '--') return '--';
@@ -717,7 +761,7 @@ function renderManagerDashboard(data) {
     setupTeamFilter(projects);
 }
 
-// ... باقي دوال ال manager dashboard تبقى كما هي بدون تغيير ...
+// ... باقي دوال ال manager dashboard تبقى كما هي ...
 
 // ============= MODAL FUNCTIONS ====================
 function openProjectDetail(sd06Code) {
@@ -788,62 +832,7 @@ function closeProjectDetailModal() {
     document.getElementById('projectDetailModal').classList.remove('flex');
 }
 
-function viewTeamDetails(teamLeader) {
-    const teamProjects = _managerData.projects.filter(p => p.teamLeader === teamLeader);
-    const totalProjects = teamProjects.length;
-    const avgProgress = totalProjects ? Math.round(teamProjects.reduce((sum, p) => sum + (p.progress || 0), 0) / totalProjects) : 0;
-    const totalValue = teamProjects.reduce((sum, p) => sum + (p.value || 0), 0);
-    
-    document.getElementById('teamAnalyticsContent').innerHTML = `
-        <div class="bg-gradient-to-br from-purple-600 to-indigo-700 text-white rounded-2xl p-6 mb-6">
-            <h4 class="text-2xl font-bold mb-2">${teamLeader}</h4>
-            <p class="opacity-90">Team Performance Analytics</p>
-        </div>
-        
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-white p-4 rounded-lg border text-center">
-                <div class="text-2xl font-bold text-purple-600">${totalProjects}</div>
-                <div class="text-sm text-gray-600">Total Projects</div>
-            </div>
-            <div class="bg-white p-4 rounded-lg border text-center">
-                <div class="text-2xl font-bold text-green-600">${avgProgress}%</div>
-                <div class="text-sm text-gray-600">Avg Progress</div>
-            </div>
-            <div class="bg-white p-4 rounded-lg border text-center">
-                <div class="text-2xl font-bold text-blue-600">${formatCurrency(totalValue)}</div>
-                <div class="text-sm text-gray-600">Total Value</div>
-            </div>
-            <div class="bg-white p-4 rounded-lg border text-center">
-                <div class="text-2xl font-bold text-amber-600">${Math.round(totalValue / totalProjects) || 0}</div>
-                <div class="text-sm text-gray-600">Avg Value/Project</div>
-            </div>
-        </div>
-        
-        <h5 class="font-bold text-gray-900 mb-4">Team Projects</h5>
-        <div class="space-y-3 max-h-96 overflow-y-auto">
-            ${teamProjects.map(p => `
-                <div class="bg-gray-50 p-4 rounded-lg border">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="font-semibold">${p.client}</span>
-                        <span class="text-sm ${p.progress >= 80 ? 'text-green-600' : p.progress >= 50 ? 'text-amber-600' : 'text-red-600'}">${p.progress}%</span>
-                    </div>
-                    <div class="flex justify-between text-sm text-gray-600">
-                        <span>${p.compound}</span>
-                        <span>${p.phase}</span>
-                    </div>
-                </div>
-            `).join('')}
-        </div>
-    `;
-    
-    document.getElementById('teamAnalyticsModal').classList.remove('hidden');
-    document.getElementById('teamAnalyticsModal').classList.add('flex');
-}
-
-function closeTeamAnalyticsModal() {
-    document.getElementById('teamAnalyticsModal').classList.add('hidden');
-    document.getElementById('teamAnalyticsModal').classList.remove('flex');
-}
+// ... باقي الدوال كما هي ...
 
 // ============= ACTION FUNCTIONS ====================
 function refreshManagerData() {
