@@ -3,8 +3,8 @@
  * Fast, Cached, and Reliable
  ******************************************************/
 
-// ============= CONFIGURATION ===================
-const API_URL = "https://script.google.com/macros/s/AKfycbzE9qCaHYQLLFsnZUPeAvUV1HEq5i3oT5-ZMRC01yoh1CAb657_0yZzXpvX9-E5GJe5/exec";
+// ============= CONFIG ===================
+const API_URL = "https://script.google.com/macros/s/AKfycbxxDY4zZaGKD4F5KHvdfJpgbNyjhrRFwF0z5XWwaTN4J3M9Cd9We0eZuGknK50cRsjO/exec";
 
 // Cache duration - 10 minutes
 const CACHE_DURATION = 10 * 60 * 1000;
@@ -34,7 +34,6 @@ const frontendCache = {
         expiry: Date.now() + duration
       };
       localStorage.setItem(`portal_cache_${key}`, JSON.stringify(item));
-      console.log('Cache set:', key);
     } catch (e) {
       console.warn('Cache write error:', e);
     }
@@ -55,7 +54,6 @@ const frontendCache = {
 // ============= STATE MANAGEMENT ====================
 let _managerData = null;
 let _currentAuth = null;
-let _charts = {};
 let currentUnits = [];
 let contactData = {};
 
@@ -90,8 +88,8 @@ const setHTML = (id, html) => {
 async function apiCall(action, params = {}, useCache = true) {
   const cacheKey = `${action}_${JSON.stringify(params)}`;
   
-  // Check cache first
-  if (useCache) {
+  // Check cache first for non-auth calls
+  if (useCache && action !== 'authenticate') {
     const cached = frontendCache.get(cacheKey);
     if (cached) {
       return cached;
@@ -101,21 +99,18 @@ async function apiCall(action, params = {}, useCache = true) {
   try {
     const urlParams = new URLSearchParams({
       action: action,
-      timestamp: Date.now(), // Prevent caching
       ...params
     });
-    
-    console.log(`API Call: ${action}`, params);
     
     const startTime = Date.now();
     const response = await fetch(`${API_URL}?${urlParams}`);
     const data = await response.json();
     const endTime = Date.now();
     
-    console.log(`API Response (${endTime - startTime}ms):`, data);
+    console.log(`API ${action} took ${endTime - startTime}ms`);
     
     // Cache successful responses
-    if (data.ok && useCache) {
+    if (data.ok && useCache && action !== 'authenticate') {
       frontendCache.set(cacheKey, data);
     }
     
@@ -124,15 +119,14 @@ async function apiCall(action, params = {}, useCache = true) {
     console.error('API call failed:', error);
     return { 
       ok: false, 
-      error: 'Network error - Please check your connection',
-      details: error.message 
+      error: 'Network error - Please check your connection'
     };
   }
 }
 
 // Specific API functions
 async function authenticate(username, password) {
-  return apiCall('authenticate', { username, password }, false); // No cache for auth
+  return apiCall('authenticate', { username, password }, false);
 }
 
 async function getClientReport(sd06Code) {
@@ -147,18 +141,13 @@ async function getContactData() {
   return apiCall('getContactData');
 }
 
-async function pingAPI() {
-  return apiCall('ping', {}, false);
-}
-
 // ============= AUTHENTICATION & SESSION ====================
 // Auto-login on page load
 (function() {
   try {
-    const saved = JSON.parse(localStorage.getItem('portal_auth_v3') || 'null');
+    const saved = JSON.parse(localStorage.getItem('portal_auth') || 'null');
     if (saved && saved.u && saved.p) {
       const u = atob(saved.u), p = atob(saved.p);
-      console.log('Auto-login attempt for:', u);
       authenticate(u, p).then(res => onAuth(res, true, saved));
     }
   } catch (e) {
@@ -199,9 +188,13 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
 
 function showError(message) {
   const errorDiv = document.getElementById('errorMessage');
-  errorDiv.textContent = message;
-  errorDiv.classList.remove('hidden');
-  setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+  if (errorDiv) {
+    errorDiv.textContent = message;
+    errorDiv.classList.remove('hidden');
+    setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+  } else {
+    alert(message);
+  }
 }
 
 async function onAuth(res, remember, creds) {
@@ -210,20 +203,18 @@ async function onAuth(res, remember, creds) {
     return; 
   }
   
-  console.log('Auth successful:', res);
+  // Pre-load contact data in background
+  getContactData().then(contactRes => {
+    if (contactRes.ok) {
+      contactData = contactRes.contacts || {};
+      console.log('Contact data loaded:', Object.keys(contactData).length, 'contacts');
+    }
+  });
   
-  // Pre-load contact data
-  const contactRes = await getContactData();
-  if (contactRes.ok) {
-    contactData = contactRes.contacts || {};
-    console.log('Contact data loaded:', Object.keys(contactData).length, 'contacts');
-  }
-  
-  // Hide login, show appropriate dashboard
   document.getElementById('loginScreen').classList.add('hidden');
   
   if (remember && creds) { 
-    localStorage.setItem('portal_auth_v3', JSON.stringify({ 
+    localStorage.setItem('portal_auth', JSON.stringify({ 
       u: creds.u, 
       p: creds.p, 
       role: res.role 
@@ -248,7 +239,7 @@ async function onAuth(res, remember, creds) {
 
 function logout() {
   // Clear all storage
-  localStorage.removeItem('portal_auth_v3');
+  localStorage.removeItem('portal_auth');
   frontendCache.clear();
   
   // Reset state
@@ -256,12 +247,6 @@ function logout() {
   _currentAuth = null;
   currentUnits = [];
   contactData = {};
-  
-  // Destroy charts
-  Object.values(_charts).forEach(chart => {
-    if (chart && typeof chart.destroy === 'function') chart.destroy();
-  });
-  _charts = {};
   
   // Show login screen
   document.getElementById('clientDashboard').classList.add('hidden');
@@ -276,7 +261,7 @@ function logout() {
 function loadClient(auth) {
   setTxt('welcomeUser', `Welcome, ${auth.name}`);
   
-  // Clear previous tabs
+  // Clear any existing unit tabs
   setHTML('unitTabsContainer', '');
   
   if (auth.units && auth.units.length > 1) {
@@ -404,8 +389,11 @@ function renderClient(d) {
     setStatusChip(ex?.status);
     setTxt('overallProgressText', ex?.overallProgress || '');
   } else {
-    document.getElementById('projectStatusChip').className = 'px-6 py-3 rounded-2xl text-sm font-semibold inline-block bg-blue-500/10 text-blue-700 mb-3';
-    document.getElementById('projectStatusChip').textContent = 'IN PROGRESS';
+    const chip = document.getElementById('projectStatusChip');
+    if (chip) {
+      chip.className = 'px-6 py-3 rounded-2xl text-sm font-semibold inline-block bg-blue-500/10 text-blue-700 mb-3';
+      chip.textContent = 'IN PROGRESS';
+    }
     setTxt('overallProgressText', 'Project is currently in progress');
   }
 
@@ -422,9 +410,6 @@ function renderClient(d) {
   
   const timelineProgress = hasExecutionData ? calculateTimelineProgress(actual.start, actual.end) : 0;
   setTxt('timelineProgress', `${timelineProgress}%`);
-
-  // Render Gantt Chart
-  renderEnhancedGanttChart(planned, actual);
 
   // Work Progress Breakdown
   renderWorkProgress(ex.work || {}, currentPhase);
@@ -476,9 +461,8 @@ async function loadManagerData() {
 function renderManagerDashboard(data) {
   const projects = data.projects || [];
   const totals = data.totals || {};
-  const summary = data.summary || {};
   
-  console.log('Rendering manager dashboard:', { projects: projects.length, totals, summary });
+  console.log('Rendering manager dashboard with:', projects.length, 'projects');
 
   // Update quick stats
   setTxt('totalProjectsCount', projects.length);
@@ -496,35 +480,6 @@ function renderManagerDashboard(data) {
   
   // Render projects grid
   renderProjectsGrid(projects);
-  
-  // Render summary cards
-  renderSummaryCards(summary, totals);
-}
-
-function renderSummaryCards(summary, totals) {
-  const statsContainer = document.getElementById('managerStats');
-  if (!statsContainer) return;
-  
-  statsContainer.innerHTML = `
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-      <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow">
-        <div class="text-white/80 text-sm">Total Projects</div>
-        <div class="text-3xl font-extrabold">${summary.totalProjects || 0}</div>
-      </div>
-      <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow">
-        <div class="text-white/80 text-sm">On Time</div>
-        <div class="text-3xl font-extrabold">${summary.onTime || 0}</div>
-      </div>
-      <div class="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-6 text-white shadow">
-        <div class="text-white/80 text-sm">Delayed</div>
-        <div class="text-3xl font-extrabold">${summary.delayed || 0}</div>
-      </div>
-      <div class="bg-gradient-to-br from-rose-500 to-rose-600 rounded-2xl p-6 text-white shadow">
-        <div class="text-white/80 text-sm">Critical</div>
-        <div class="text-3xl font-extrabold">${summary.critical || 0}</div>
-      </div>
-    </div>
-  `;
 }
 
 function renderProjectsGrid(projects) {
@@ -820,42 +775,6 @@ function setup3D(url) {
   }
 }
 
-// ============= GANTT CHART ====================
-function renderEnhancedGanttChart(planned, actual) {
-  const container = document.getElementById('ganttContainer');
-  
-  if (!planned.start || !planned.end) {
-    container.innerHTML = '<div class="text-center text-gray-500 py-8">No timeline data available</div>';
-    return;
-  }
-  
-  // تبسيط الـ Gantt Chart للسرعة
-  container.innerHTML = `
-    <div class="bg-gray-100 rounded-lg p-4">
-      <div class="flex justify-between items-center mb-4">
-        <span class="text-sm font-semibold text-blue-600">Planned</span>
-        <span class="text-sm font-semibold text-green-600">Actual</span>
-      </div>
-      <div class="space-y-3">
-        <div class="flex items-center">
-          <div class="w-20 text-sm text-gray-600">Start:</div>
-          <div class="flex-1">
-            <div class="text-sm">${planned.start || '--'}</div>
-            <div class="text-sm text-green-600">${actual.start || '--'}</div>
-          </div>
-        </div>
-        <div class="flex items-center">
-          <div class="w-20 text-sm text-gray-600">End:</div>
-          <div class="flex-1">
-            <div class="text-sm">${planned.end || '--'}</div>
-            <div class="text-sm text-green-600">${actual.end || 'In Progress'}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
 // ============= MODAL FUNCTIONS ====================
 function openProjectDetail(sd06Code) {
   const project = _managerData?.projects.find(p => p.sd06Code === sd06Code);
@@ -932,8 +851,7 @@ function refreshManagerData() {
 }
 
 function exportToExcel() {
-  alert('Export feature would open the Google Sheets document');
-  window.open(`https://docs.google.com/spreadsheets/d/${SHEET_ID}`, '_blank');
+  window.open(`https://docs.google.com/spreadsheets/d/1W3maR0G9MMJ9u6VHKSVklTy1PJmfsjKip3TdbUOBnxg/edit`, '_blank');
 }
 
 function criticalAlerts() {
@@ -951,4 +869,4 @@ function criticalAlerts() {
 }
 
 // ============= INITIALIZATION ====================
-console.log('Construction Portal Frontend Loaded');
+console.log('Construction Portal Frontend Loaded - Optimized Version');
