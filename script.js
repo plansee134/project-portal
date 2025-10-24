@@ -3,9 +3,9 @@
  * PlanSee Interiors - Optimized for Performance & UX
  ******************************************************/
 
-// ============= CONFIGURATION & CONSTANTS =============
+// ============= CONFIGURATION =============
 const CONFIG = {
-  API_URL: "https://script.google.com/macros/s/AKfycbx7dD-jPp217vp01IZN6qG_FiYgRRAIqP5UT-CJqc0h6N8nrfOTOZK9S0ax7mqkvfIa/exec",
+  API_URL: "https://script.google.com/macros/s/AKfycbxIDpnmt7fSyLBujis7V0g0cVE0bqLVaY33u9-kKABOXvI7kTu8d8T64ZcJbL0lOvv5/exec",
   REQUEST_TIMEOUT: 30000,
   CACHE_TTL: 5 * 60 * 1000, // 5 minutes
   MAX_CONCURRENT_REQUESTS: 3
@@ -21,7 +21,7 @@ class AppState {
     this._charts = new Map();
     this.currentUnits = [];
     this.contactData = {};
-    this._requestQueue = new Map();
+    this._activeRequests = new Map();
     this._cache = new Map();
   }
   
@@ -34,18 +34,10 @@ class AppState {
   
   // Getters with validation
   get managerData() { return this._managerData; }
-  set managerData(data) { this._managerData = this.validateData(data); }
+  set managerData(data) { this._managerData = data && typeof data === 'object' ? data : null; }
   
   get currentAuth() { return this._currentAuth; }
-  set currentAuth(auth) { this._currentAuth = this.validateAuth(auth); }
-  
-  validateData(data) {
-    return data && typeof data === 'object' ? data : null;
-  }
-  
-  validateAuth(auth) {
-    return auth && auth.ok && auth.role ? auth : null;
-  }
+  set currentAuth(auth) { this._currentAuth = auth && auth.ok ? auth : null; }
   
   // Cache management
   cacheSet(key, data, ttl = CONFIG.CACHE_TTL) {
@@ -70,21 +62,21 @@ class AppState {
   
   // Request management
   registerRequest(id, controller) {
-    this._requestQueue.set(id, { controller, timestamp: Date.now() });
+    this._activeRequests.set(id, { controller, timestamp: Date.now() });
     this.cleanupOldRequests();
   }
   
   cancelRequest(id) {
-    const request = this._requestQueue.get(id);
+    const request = this._activeRequests.get(id);
     if (request) {
       request.controller.abort();
-      this._requestQueue.delete(id);
+      this._activeRequests.delete(id);
     }
   }
   
   cleanupOldRequests() {
     const now = Date.now();
-    for (const [id, request] of this._requestQueue) {
+    for (const [id, request] of this._activeRequests) {
       if (now - request.timestamp > CONFIG.REQUEST_TIMEOUT) {
         this.cancelRequest(id);
       }
@@ -107,7 +99,7 @@ class AppState {
     this._charts.clear();
     
     // Cancel all pending requests
-    this._requestQueue.forEach((request, id) => {
+    this._activeRequests.forEach((request, id) => {
       this.cancelRequest(id);
     });
   }
@@ -197,8 +189,21 @@ class ApiService {
   }
   
   static showLoading() {
-    const overlay = document.getElementById('loadingOverlay');
-    if (overlay) overlay.classList.remove('hidden');
+    // Create loading overlay if it doesn't exist
+    let overlay = document.getElementById('loadingOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'loadingOverlay';
+      overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden';
+      overlay.innerHTML = `
+        <div class="bg-white rounded-lg p-6 flex items-center space-x-3">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span class="text-gray-700">Loading...</span>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+    }
+    overlay.classList.remove('hidden');
   }
   
   static hideLoading() {
@@ -318,8 +323,15 @@ class SessionManager {
   }
 }
 
-// ============= UI COMPONENTS =============
-class UIComponents {
+// ============= UI UTILITIES =============
+class UIHelper {
+  static setText(id, text) {
+    const element = document.getElementById(id);
+    if (element) {
+      element.textContent = text ?? '--';
+    }
+  }
+  
   static showElement(id) {
     const element = document.getElementById(id);
     if (element) element.classList.remove('hidden');
@@ -330,18 +342,10 @@ class UIComponents {
     if (element) element.classList.add('hidden');
   }
   
-  static setText(id, text) {
-    const element = document.getElementById(id);
-    if (element) {
-      element.textContent = text ?? '--';
-      element.title = text ?? '';
-    }
-  }
-  
   static showNotification(message, type = 'info') {
-    // Implementation for toast notifications
+    // Simple notification system - can be enhanced with toast library
     console.log(`[${type.toUpperCase()}] ${message}`);
-    // Could be integrated with a proper notification system
+    alert(message); // Temporary - replace with proper toast
   }
   
   static formatCurrency(amount) {
@@ -377,22 +381,138 @@ class UIComponents {
     const number = Number(String(value ?? 0).replace('%', ''));
     return isNaN(number) ? 0 : Math.max(0, Math.min(100, Math.round(number)));
   }
+  
+  static getLastSunday() {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const diff = today.getDate() - dayOfWeek;
+    const lastSunday = new Date(today.setDate(diff));
+    return lastSunday.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  }
 }
 
-// ============= CLIENT DASHBOARD CONTROLLER =============
-class ClientDashboard {
-  static async initialize(authData) {
-    const appState = AppState.getInstance();
-    appState.currentAuth = authData;
+// ============= APPLICATION CONTROLLER =============
+class AppController {
+  static async initialize() {
+    this.setupEventListeners();
+    SessionManager.autoLogin();
+    this.setupErrorHandling();
+  }
+  
+  static setupEventListeners() {
+    // Login form
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+      loginForm.addEventListener('submit', this.handleLogin.bind(this));
+    }
     
-    UIComponents.setText('welcomeUser', `Welcome, ${authData.name}`);
-    UIComponents.hideElement('loginScreen');
-    UIComponents.showElement('clientDashboard');
+    // Logout buttons
+    document.addEventListener('click', (e) => {
+      if (e.target.matches('[data-action="logout"]')) {
+        this.handleLogout();
+      }
+    });
+  }
+  
+  static async handleLogin(event) {
+    event.preventDefault();
+    
+    const username = document.getElementById('username')?.value.trim();
+    const password = document.getElementById('password')?.value.trim();
+    const remember = document.getElementById('rememberMe')?.checked;
+    
+    if (!username || !password) {
+      UIHelper.showNotification('Please enter both username and password', 'warning');
+      return;
+    }
+    
+    try {
+      UIHelper.showNotification('Signing in...', 'info');
+      
+      const authResult = await AuthService.authenticate(username, password);
+      
+      if (!authResult.ok) {
+        throw new Error(authResult.error || 'Authentication failed');
+      }
+      
+      await this.handleAuthSuccess(authResult, remember, {
+        u: btoa(username),
+        p: btoa(password)
+      });
+      
+    } catch (error) {
+      console.error('Login error:', error);
+      UIHelper.showNotification(error.message || 'Login failed', 'error');
+    }
+  }
+  
+  static async handleAuthSuccess(authResult, remember, credentials) {
+    const appState = AppState.getInstance();
+    appState.currentAuth = authResult;
+    
+    // Save session
+    SessionManager.saveSession(authResult, credentials, remember);
     
     // Load contact data in background
     this.loadContactData();
     
-    // Initialize unit display
+    // Redirect based on role
+    if (authResult.role === 'manager') {
+      await this.loadManagerDashboard();
+    } else {
+      await this.loadClientDashboard(authResult);
+    }
+    
+    UIHelper.showNotification(`Welcome, ${authResult.name}!`, 'success');
+  }
+  
+  static async loadContactData() {
+    try {
+      const appState = AppState.getInstance();
+      const contactResult = await AuthService.getContactData();
+      
+      if (contactResult.ok) {
+        appState.contactData = contactResult.contacts || {};
+        console.log(`Loaded ${Object.keys(appState.contactData).length} contacts`);
+      }
+    } catch (error) {
+      console.error('Failed to load contact data:', error);
+    }
+  }
+  
+  static async loadManagerDashboard() {
+    try {
+      const appState = AppState.getInstance();
+      const data = await AuthService.getManagerDashboard();
+      
+      if (!data.ok) {
+        throw new Error(data.error || 'Failed to load dashboard data');
+      }
+      
+      appState.managerData = data;
+      this.renderManagerDashboard(data);
+      UIHelper.hideElement('loginScreen');
+      UIHelper.showElement('managerDashboard');
+      this.updateLastUpdate();
+      
+    } catch (error) {
+      UIHelper.showNotification('Failed to load manager dashboard', 'error');
+    }
+  }
+  
+  static async loadClientDashboard(authData) {
+    const appState = AppState.getInstance();
+    appState.currentAuth = authData;
+    
+    UIHelper.setText('welcomeUser', `Welcome, ${authData.name}`);
+    UIHelper.hideElement('loginScreen');
+    UIHelper.showElement('clientDashboard');
+    
     if (authData.units && authData.units.length > 0) {
       this.setupUnitNavigation(authData.units);
       await this.loadUnitData(authData.units[0].sd06Code);
@@ -408,17 +528,17 @@ class ClientDashboard {
     if (!container) return;
     
     if (units.length > 1) {
-      UIComponents.showElement('unitTabs');
+      UIHelper.showElement('unitTabs');
       container.innerHTML = units.map((unit, index) => `
         <button class="unit-tab ${index === 0 ? 'active' : ''}" 
-                onclick="ClientDashboard.switchUnit('${unit.sd06Code}')"
+                onclick="AppController.switchUnit('${unit.sd06Code}')"
                 data-unit="${unit.sd06Code}">
           <div class="text-sm font-semibold">${unit.compound || unit.unitName || unit.sd06Code}</div>
           ${unit.unitName && unit.compound ? `<div class="text-xs text-gray-600">${unit.unitName}</div>` : ''}
         </button>
       `).join('');
     } else {
-      UIComponents.hideElement('unitTabs');
+      UIHelper.hideElement('unitTabs');
     }
   }
   
@@ -446,33 +566,33 @@ class ClientDashboard {
         throw new Error(report.error || 'Failed to load unit data');
       }
       
-      this.renderUnitData(report);
+      this.renderClientData(report);
       
       if (contentElement) {
         setTimeout(() => contentElement.classList.add('fade-in'), 50);
       }
     } catch (error) {
       console.error('Unit data loading failed:', error);
-      UIComponents.showNotification(`Failed to load unit data: ${error.message}`, 'error');
+      UIHelper.showNotification(`Failed to load unit data: ${error.message}`, 'error');
     }
   }
   
-  static renderUnitData(report) {
+  static renderClientData(report) {
     const { unit, design, execution, executionTimeline, view3D, currentPhase } = report;
     
     // Basic Information
-    UIComponents.setText('clientNameValue', unit.clientName);
-    UIComponents.setText('compoundValue', unit.compound);
-    UIComponents.setText('unitTypeValue', unit.unitType);
-    UIComponents.setText('unitNumberValue', unit.unitNumber);
-    UIComponents.setText('floorsValue', unit.floors);
-    UIComponents.setText('indoorAreaValue', unit.areaIndoor);
-    UIComponents.setText('outdoorAreaValue', unit.areaOutdoor);
+    UIHelper.setText('clientNameValue', unit.clientName);
+    UIHelper.setText('compoundValue', unit.compound);
+    UIHelper.setText('unitTypeValue', unit.unitType);
+    UIHelper.setText('unitNumberValue', unit.unitNumber);
+    UIHelper.setText('floorsValue', unit.floors);
+    UIHelper.setText('indoorAreaValue', unit.areaIndoor);
+    UIHelper.setText('outdoorAreaValue', unit.areaOutdoor);
     
     // Project Details
-    UIComponents.setText('designTypeVal', design.designType);
-    UIComponents.setText('designStatusVal', design.designStatus);
-    UIComponents.setText('projectStatusVal', design.projectStatus);
+    UIHelper.setText('designTypeVal', design.designType);
+    UIHelper.setText('designStatusVal', design.designStatus);
+    UIHelper.setText('projectStatusVal', design.projectStatus);
     
     // Progress Information
     this.renderProgressSection(execution);
@@ -490,23 +610,25 @@ class ClientDashboard {
     this.setup3DView(view3D);
     
     // Update phase labels
-    UIComponents.setText('currentPhaseLabel', currentPhase);
-    UIComponents.setText('workPhaseLabel', currentPhase);
+    UIHelper.setText('currentPhaseLabel', currentPhase);
+    UIHelper.setText('workPhaseLabel', currentPhase);
   }
   
   static renderProgressSection(execution) {
-    const completion = UIComponents.clampPercentage(execution?.completion);
+    const completion = UIHelper.clampPercentage(execution?.completion);
     this.animateProgressCircle(completion);
     
     if (execution && Object.keys(execution).length > 0) {
       this.setStatusChip(execution.status);
       const cleanProgressText = (execution.overallProgress || '').replace(/^Progress:\s*/i, '');
-      UIComponents.setText('overallProgressText', cleanProgressText);
+      UIHelper.setText('overallProgressText', cleanProgressText);
     } else {
-      document.getElementById('projectStatusChip').className = 
-        'px-6 py-3 rounded-2xl text-sm font-semibold inline-block bg-blue-500/10 text-blue-700 mb-3';
-      document.getElementById('projectStatusChip').textContent = 'IN PROGRESS';
-      UIComponents.setText('overallProgressText', 'Project is currently in progress');
+      const chip = document.getElementById('projectStatusChip');
+      if (chip) {
+        chip.className = 'px-6 py-3 rounded-2xl text-sm font-semibold inline-block bg-blue-500/10 text-blue-700 mb-3';
+        chip.textContent = 'IN PROGRESS';
+      }
+      UIHelper.setText('overallProgressText', 'Project is currently in progress');
     }
   }
   
@@ -514,12 +636,12 @@ class ClientDashboard {
     const planned = timeline.planned || {};
     const actual = timeline.actual || {};
     
-    UIComponents.setText('plannedStartDate', UIComponents.formatDate(planned.start));
-    UIComponents.setText('plannedEndDate', UIComponents.formatDate(planned.end));
-    UIComponents.setText('plannedDuration', this.calculateDuration(planned.start, planned.end));
+    UIHelper.setText('plannedStartDate', UIHelper.formatDate(planned.start));
+    UIHelper.setText('plannedEndDate', UIHelper.formatDate(planned.end));
+    UIHelper.setText('plannedDuration', this.calculateDuration(planned.start, planned.end));
     
-    UIComponents.setText('actualStartDate', UIComponents.formatDate(actual.start));
-    UIComponents.setText('actualEndDate', UIComponents.formatDate(actual.end));
+    UIHelper.setText('actualStartDate', UIHelper.formatDate(actual.start));
+    UIHelper.setText('actualEndDate', UIHelper.formatDate(actual.end));
     
     this.renderGanttChart(planned, actual);
   }
@@ -530,7 +652,7 @@ class ClientDashboard {
     
     const workItems = this.getWorkItemsForPhase(work, phase);
     grid.innerHTML = workItems.map(([name, value, bgClass, textClass]) => {
-      const percentage = UIComponents.clampPercentage(value);
+      const percentage = UIHelper.clampPercentage(value);
       return `
         <div class="space-y-4 p-4 ${bgClass} rounded-2xl border shadow-lg">
           <div class="flex justify-between items-center">
@@ -585,742 +707,533 @@ class ClientDashboard {
     const accountManager = unit.accountManager || '--';
     const siteManager = team?.siteManager || '--';
     
-    UIComponents.setText('teamLeaderName', engineeringTeamLeader);
-    UIComponents.setText('teamLeaderNameTeam', teamLeaderFromSD06);
-    UIComponents.setText('accountManagerNameTeam', accountManager);
-    UIComponents.setText('siteManagerName', siteManager);
+    UIHelper.setText('teamLeaderName', engineeringTeamLeader);
+    UIHelper.setText('teamLeaderNameTeam', teamLeaderFromSD06);
+    UIHelper.setText('accountManagerNameTeam', accountManager);
+    UIHelper.setText('siteManagerName', siteManager);
     
     this.setupContactButtons(teamLeaderFromSD06, accountManager);
   }
   
   static setupContactButtons(teamLeader, accountManager) {
     const appState = AppState.getInstance();
-      // Setup team leader contact
-if (teamLeader && teamLeader !== '--') {
-  const teamLeaderCard = document.querySelector('#teamLeaderNameTeam')?.closest('.contact-card');
-  if (teamLeaderCard) {
-    teamLeaderCard.style.cursor = 'pointer';
-    teamLeaderCard.onclick = () => this.showContactInfo(teamLeader, 'Team Leader');
-    teamLeaderCard.title = `Click to contact ${teamLeader}`;
+    
+    // Team Leader contact
+    if (teamLeader && teamLeader !== '--') {
+      const teamLeaderCard = document.querySelector('#teamLeaderNameTeam')?.closest('.contact-card');
+      if (teamLeaderCard) {
+        teamLeaderCard.style.cursor = 'pointer';
+        teamLeaderCard.onclick = () => this.showContactInfo(teamLeader, 'Team Leader');
+        teamLeaderCard.title = `Click to contact ${teamLeader}`;
+      }
+    }
+    
+    // Account Manager contact
+    if (accountManager && accountManager !== '--') {
+      const accountManagerCard = document.querySelector('#accountManagerNameTeam')?.closest('.contact-card');
+      if (accountManagerCard) {
+        accountManagerCard.style.cursor = 'pointer';
+        accountManagerCard.onclick = () => this.showContactInfo(accountManager, 'Account Manager');
+        accountManagerCard.title = `Click to contact ${accountManager}`;
+      }
+    }
   }
-}
-
-// Setup account manager contact
-if (accountManager && accountManager !== '--') {
-  const accountManagerCard = document.querySelector('#accountManagerNameTeam')?.closest('.contact-card');
-  if (accountManagerCard) {
-    accountManagerCard.style.cursor = 'pointer';
-    accountManagerCard.onclick = () => this.showContactInfo(accountManager, 'Account Manager');
-    accountManagerCard.title = `Click to contact ${accountManager}`;
+  
+  static showContactInfo(name, role) {
+    const appState = AppState.getInstance();
+    
+    if (!name || name === '--') {
+      UIHelper.showNotification(`No ${role} assigned`, 'info');
+      return;
+    }
+    
+    let phoneNumber = appState.contactData[name];
+    
+    // Search by name parts
+    if (!phoneNumber) {
+      const nameParts = name.split(' ').filter(part => part.length > 2);
+      for (const part of nameParts) {
+        phoneNumber = appState.contactData[part];
+        if (phoneNumber) break;
+      }
+    }
+    
+    // Fuzzy search
+    if (!phoneNumber) {
+      for (const [contactName, number] of Object.entries(appState.contactData)) {
+        if (name.toLowerCase().includes(contactName.toLowerCase()) || 
+            contactName.toLowerCase().includes(name.toLowerCase())) {
+          phoneNumber = number;
+          break;
+        }
+      }
+    }
+    
+    if (phoneNumber) {
+      const message = `${role}: ${name}\nPhone: ${phoneNumber}\n\nDo you want to call or message?`;
+      if (confirm(message)) {
+        const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
+        window.open(`tel:${cleanPhone}`, '_blank');
+      }
+    } else {
+      UIHelper.showNotification(`${role} phone number not found for ${name}`, 'warning');
+    }
   }
-}
-}
-
-static showContactInfo(name, role) {
-const appState = AppState.getInstance();
-
-if (!name || name === '--') {
-UIComponents.showNotification(`No ${role} assigned`, 'info');
-return;
-}
-
-let phoneNumber = appState.contactData[name];
-
-// Search by name parts
-if (!phoneNumber) {
-const nameParts = name.split(' ').filter(part => part.length > 2);
-for (const part of nameParts) {
-  phoneNumber = appState.contactData[part];
-  if (phoneNumber) break;
-}
-}
-
-// Fuzzy search
-if (!phoneNumber) {
-for (const [contactName, number] of Object.entries(appState.contactData)) {
-  if (name.toLowerCase().includes(contactName.toLowerCase()) || 
-      contactName.toLowerCase().includes(name.toLowerCase())) {
-    phoneNumber = number;
-    break;
+  
+  static setup3DView(url) {
+    const card = document.getElementById('threeDCard');
+    const iframe = document.getElementById('threeDIframe');
+    const placeholder = document.getElementById('threeDPlaceholder');
+    
+    if (!card || !iframe || !placeholder) return;
+    
+    const cleanUrl = (url || '').trim();
+    const isValidUrl = /^https?:\/\//i.test(cleanUrl);
+    
+    if (isValidUrl) {
+      UIHelper.showElement('threeDCard');
+      iframe.src = cleanUrl;
+      UIHelper.showElement('threeDIframe');
+      UIHelper.hideElement('threeDPlaceholder');
+    } else {
+      UIHelper.hideElement('threeDCard');
+      iframe.src = '';
+    }
   }
-}
-}
-
-if (phoneNumber) {
-const message = `${role}: ${name}\nPhone: ${phoneNumber}\n\nDo you want to call or message?`;
-if (confirm(message)) {
-  const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
-  window.open(`tel:${cleanPhone}`, '_blank');
-}
-} else {
-UIComponents.showNotification(`${role} phone number not found for ${name}`, 'warning');
-}
-}
-
-static setup3DView(url) {
-const card = document.getElementById('threeDCard');
-const iframe = document.getElementById('threeDIframe');
-const placeholder = document.getElementById('threeDPlaceholder');
-
-if (!card || !iframe || !placeholder) return;
-
-const cleanUrl = (url || '').trim();
-const isValidUrl = /^https?:\/\//i.test(cleanUrl);
-
-if (isValidUrl) {
-UIComponents.showElement('threeDCard');
-iframe.src = cleanUrl;
-UIComponents.showElement('threeDIframe');
-UIComponents.hideElement('threeDPlaceholder');
-} else {
-UIComponents.hideElement('threeDCard');
-iframe.src = '';
-}
-}
-
-static renderGanttChart(planned, actual) {
-const container = document.getElementById('ganttContainer');
-const timeline = document.getElementById('ganttTimeline');
-
-if (!container || !timeline) return;
-
-if (!planned.start || !planned.end) {
-container.innerHTML = '<div class="text-center text-gray-500 py-8">No timeline data available</div>';
-timeline.innerHTML = '';
-return;
-}
-
-try {
-const plannedStart = new Date(planned.start);
-const plannedEnd = new Date(planned.end);
-const actualStart = actual.start ? new Date(actual.start) : null;
-const actualEnd = actual.end ? new Date(actual.end) : null;
-
-const allDates = [plannedStart, plannedEnd];
-if (actualStart) allDates.push(actualStart);
-if (actualEnd) allDates.push(actualEnd);
-
-const minDate = new Date(Math.min(...allDates.map(d => d.getTime())));
-const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())));
-const totalDuration = maxDate - minDate;
-
-const calculatePosition = (date) => ((date - minDate) / totalDuration) * 100;
-
-container.innerHTML = `
-  <div class="relative h-32 bg-gray-100 rounded-lg overflow-hidden">
-    <div class="absolute top-1/2 left-0 right-0 h-1 bg-gray-300 transform -translate-y-1/2"></div>
-    
-    <div class="absolute top-1/4 h-4 bg-blue-500 rounded-full transform -translate-y-1/2" 
-         style="left: ${calculatePosition(plannedStart)}%; width: ${calculatePosition(plannedEnd) - calculatePosition(plannedStart)}%">
-      <div class="absolute -top-6 left-0 right-0 text-center text-xs text-blue-600 font-medium">Planned</div>
-      <div class="absolute -top-12 left-0 text-xs text-blue-500">${UIComponents.formatDate(planned.start)}</div>
-      <div class="absolute -top-12 right-0 text-xs text-blue-500">${UIComponents.formatDate(planned.end)}</div>
-    </div>
-    
-    ${actualStart ? `
-    <div class="absolute top-3/4 h-4 bg-green-500 rounded-full transform -translate-y-1/2" 
-         style="left: ${calculatePosition(actualStart)}%; width: ${calculatePosition(actualEnd || new Date()) - calculatePosition(actualStart)}%">
-      <div class="absolute -bottom-6 left-0 right-0 text-center text-xs text-green-600 font-medium">Actual</div>
-      <div class="absolute -bottom-12 left-0 text-xs text-green-500">${UIComponents.formatDate(actual.start)}</div>
-      ${actualEnd ? `
-      <div class="absolute -bottom-12 right-0 text-xs text-green-500">${UIComponents.formatDate(actual.end)}</div>
-      ` : `
-      <div class="absolute -bottom-12 right-0 text-xs text-green-500">In Progress</div>
-      `}
-    </div>
-    ` : ''}
-    
-    <div class="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-gray-500">
-      <span>${UIComponents.formatDate(minDate)}</span>
-      <span>${UIComponents.formatDate(maxDate)}</span>
-    </div>
-  </div>
-`;
-
-// Timeline markers
-const months = [];
-let currentDate = new Date(minDate);
-while (currentDate <= maxDate) {
-  months.push(new Date(currentDate));
-  currentDate.setMonth(currentDate.getMonth() + 1);
-}
-
-timeline.innerHTML = months.map(date => `
-  <div class="gantt-timeline-item" style="left: ${calculatePosition(date)}%;">
-    ${date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-  </div>
-`).join('');
-
-} catch (error) {
-console.error('Gantt chart rendering error:', error);
-container.innerHTML = '<div class="text-center text-red-500 py-8">Error rendering timeline</div>';
-}
-}
-
-static animateProgressCircle(percentage) {
-const circle = document.getElementById('progressCircle');
-const label = document.getElementById('progressPercentage');
-
-if (!circle || !label) return;
-
-const radius = 70;
-const circumference = 2 * Math.PI * radius;
-const offset = circumference - (percentage / 100) * circumference;
-
-circle.style.strokeDashoffset = Math.max(0, Math.min(offset, circumference));
-label.textContent = `${percentage}%`;
-}
-
-static setStatusChip(status) {
-const chip = document.getElementById('projectStatusChip');
-if (!chip) return;
-
-const statusText = (status || '').toLowerCase();
-let className = 'px-6 py-3 rounded-2xl text-sm font-semibold inline-block ';
-let text = 'On Time';
-
-if (statusText.includes('complete')) {
-className += 'bg-blue-500/10 text-blue-700';
-text = 'Completed';
-} else if (statusText.includes('critical')) {
-className += 'bg-rose-500/10 text-rose-700';
-text = 'Critical';
-} else if (statusText.includes('delay')) {
-className += 'bg-amber-500/10 text-amber-700';
-text = 'Delayed';
-} else {
-className += 'bg-emerald-500/10 text-emerald-700';
-}
-
-chip.className = className;
-chip.textContent = text;
-}
-
-static calculateDuration(startStr, endStr) {
-try {
-const start = startStr ? new Date(startStr) : null;
-const end = endStr ? new Date(endStr) : null;
-
-if (!start || !end || isNaN(start) || isNaN(end)) return '--';
-
-const diffTime = Math.abs(end - start);
-const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-return `${diffDays} days`;
-} catch (error) {
-return '--';
-}
-}
-
-static showNoUnitsMessage() {
-UIComponents.setText('dashboardTitle', 'No Units Available');
-UIComponents.setText('dashboardSubtitle', 'Please contact administrator');
-UIComponents.hideElement('unitContent');
-}
-
-static async loadContactData() {
-try {
-const appState = AppState.getInstance();
-const contactResult = await AuthService.getContactData();
-
-if (contactResult.ok) {
-  appState.contactData = contactResult.contacts || {};
-  console.log(`Loaded ${Object.keys(appState.contactData).length} contacts`);
-}
-} catch (error) {
-console.error('Failed to load contact data:', error);
-}
-}
-
-static updateLastUpdate() {
-const today = new Date();
-const dayOfWeek = today.getDay();
-const diff = today.getDate() - dayOfWeek;
-const lastSunday = new Date(today.setDate(diff));
-const formattedDate = lastSunday.toLocaleDateString('en-US', {
-weekday: 'long',
-year: 'numeric',
-month: 'long',
-day: 'numeric'
-});
-
-UIComponents.setText('lastUpdate', `Last updated: ${formattedDate}`);
-UIComponents.setText('managerLastUpdate', `Last updated: ${formattedDate}`);
-}
-}
-
-// ============= MANAGER DASHBOARD CONTROLLER =============
-class ManagerDashboard {
-static async initialize() {
-const appState = AppState.getInstance();
-
-UIComponents.hideElement('loginScreen');
-UIComponents.showElement('managerDashboard');
-
-try {
-await this.loadDashboardData();
-this.updateLastUpdate();
-} catch (error) {
-console.error('Manager dashboard initialization failed:', error);
-UIComponents.showNotification('Failed to load dashboard data', 'error');
-}
-}
-
-static async loadDashboardData() {
-try {
-const data = await AuthService.getManagerDashboard();
-
-if (!data.ok) {
-  throw new Error(data.error || 'Failed to load dashboard data');
-}
-
-const appState = AppState.getInstance();
-appState.managerData = data;
-
-this.renderDashboard(data);
-} catch (error) {
-throw error;
-}
-}
-
-static renderDashboard(data) {
-const { projects, teamLeaders, totals } = data;
-
-this.renderQuickStats(projects, totals);
-this.renderProjectsGrid(projects);
-this.renderTeamLeaders(teamLeaders);
-
-// Render charts if needed
-this.renderCharts(projects);
-}
-
-static renderQuickStats(projects, totals) {
-UIComponents.setText('totalProjectsCount', projects.length);
-UIComponents.setText('avgProgressValue', `${totals.avgProgress || 0}%`);
-UIComponents.setText('totalValueAmount', UIComponents.formatCurrency(totals.totalValue));
-
-const uniqueTeams = new Set(projects.map(p => p.teamLeader).filter(Boolean));
-UIComponents.setText('activeTeamsCount', uniqueTeams.size);
-}
-
-static renderProjectsGrid(projects) {
-const grid = document.getElementById('projectsGrid');
-if (!grid) return;
-
-grid.innerHTML = projects.map(project => `
-  <div class="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-    <div class="flex justify-between items-start mb-4">
-      <div>
-        <h3 class="font-bold text-lg text-gray-900">${project.client}</h3>
-        <p class="text-sm text-gray-600">${project.compound}</p>
-      </div>
-      <span class="px-3 py-1 rounded-full text-xs font-semibold ${
-        project.progress >= 80 ? 'bg-green-100 text-green-800' :
-        project.progress >= 50 ? 'bg-yellow-100 text-yellow-800' :
-        'bg-red-100 text-red-800'
-      }">
-        ${project.progress}%
-      </span>
-    </div>
-    
-    <div class="space-y-2 text-sm">
-      <div class="flex justify-between">
-        <span class="text-gray-600">Phase:</span>
-        <span class="font-semibold">${project.phase}</span>
-      </div>
-      <div class="flex justify-between">
-        <span class="text-gray-600">Team Leader:</span>
-        <span class="font-semibold">${project.teamLeader || '--'}</span>
-      </div>
-      <div class="flex justify-between">
-        <span class="text-gray-600">Value:</span>
-        <span class="font-semibold">${UIComponents.formatCurrency(project.value)}</span>
-      </div>
-    </div>
-    
-    <div class="mt-4 pt-4 border-t border-gray-200">
-      <div class="w-full bg-gray-200 rounded-full h-2">
-        <div class="h-2 rounded-full transition-all duration-500 ${
-          project.progress >= 80 ? 'bg-green-500' :
-          project.progress >= 50 ? 'bg-yellow-500' :
-          'bg-red-500'
-        }" style="width: ${project.progress}%"></div>
-      </div>
-    </div>
-    
-    <div class="mt-4 flex space-x-2">
-      <button onclick="ManagerDashboard.openProjectDetail('${project.sd06Code}')" 
-              class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm">
-        View Details
-      </button>
-    </div>
-  </div>
-`).join('');
-}
-
-static renderTeamLeaders(teamLeaders) {
-const container = document.getElementById('teamLeadersGrid');
-if (!container) return;
-
-container.innerHTML = teamLeaders.map(leader => `
-  <div class="bg-white rounded-xl border border-gray-200 p-6">
-    <h4 class="font-bold text-lg mb-3">${leader.name}</h4>
-    <div class="grid grid-cols-2 gap-4 text-sm">
-      <div class="text-center">
-        <div class="text-2xl font-bold text-blue-600">${leader.projectCount}</div>
-        <div class="text-gray-600">Projects</div>
-      </div>
-      <div class="text-center">
-        <div class="text-2xl font-bold text-green-600">${leader.avgProgress}%</div>
-        <div class="text-gray-600">Avg Progress</div>
-      </div>
-    </div>
-    <button onclick="ManagerDashboard.viewTeamDetails('${leader.name}')" 
-            class="w-full mt-4 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors text-sm">
-      View Team
-    </button>
-  </div>
-`).join('');
-}
-
-static renderCharts(projects) {
-// Chart rendering implementation would go here
-// This could use Chart.js or similar library
-console.log('Rendering charts for', projects.length, 'projects');
-}
-
-static openProjectDetail(sd06Code) {
-const appState = AppState.getInstance();
-const project = appState.managerData?.projects?.find(p => p.sd06Code === sd06Code);
-
-if (!project) {
-UIComponents.showNotification('Project not found', 'error');
-return;
-}
-
-const modal = document.getElementById('projectDetailModal');
-const title = document.getElementById('projectDetailTitle');
-const content = document.getElementById('projectDetailContent');
-
-if (!modal || !title || !content) return;
-
-title.textContent = `Project Details - ${project.client}`;
-
-content.innerHTML = `
-  <div class="grid md:grid-cols-2 gap-6">
-    <div class="space-y-4">
-      <h4 class="font-bold text-gray-900 text-lg">Basic Information</h4>
-      <div class="bg-gray-50 p-4 rounded-lg space-y-2">
-        <div class="flex justify-between"><span>Client:</span><span class="font-semibold">${project.client}</span></div>
-        <div class="flex justify-between"><span>Compound:</span><span class="font-semibold">${project.compound}</span></div>
-        <div class="flex justify-between"><span>SD06 Code:</span><span class="font-semibold">${project.sd06Code}</span></div>
-        <div class="flex justify-between"><span>Phase:</span><span class="font-semibold">${project.phase}</span></div>
-      </div>
-    </div>
-    
-    <div class="space-y-4">
-      <h4 class="font-bold text-gray-900 text-lg">Progress & Status</h4>
-      <div class="bg-gray-50 p-4 rounded-lg space-y-2">
-        <div class="flex justify-between"><span>Execution Progress:</span><span class="font-semibold text-green-600">${project.progress}%</span></div>
-        <div class="flex justify-between"><span>Status:</span><span class="font-semibold">${project.status}</span></div>
-        <div class="flex justify-between"><span>Team Leader:</span><span class="font-semibold">${project.teamLeader || '--'}</span></div>
-        <div class="flex justify-between"><span>Site Manager:</span><span class="font-semibold">${project.siteManager || '--'}</span></div>
-      </div>
-    </div>
-  </div>
   
-  <div class="grid md:grid-cols-2 gap-6">
-    <div class="space-y-4">
-      <h4 class="font-bold text-gray-900 text-lg">Financial Information</h4>
-      <div class="bg-gray-50 p-4 rounded-lg space-y-2">
-        <div class="flex justify-between"><span>Contract Value:</span><span class="font-semibold">${UIComponents.formatCurrency(project.value)}</span></div>
-        <div class="flex justify-between"><span>Amount Paid:</span><span class="font-semibold text-green-600">${UIComponents.formatCurrency(project.paid)}</span></div>
-        <div class="flex justify-between"><span>Pending:</span><span class="font-semibold text-amber-600">${UIComponents.formatCurrency(project.value - project.paid)}</span></div>
-      </div>
-    </div>
+  static renderGanttChart(planned, actual) {
+    const container = document.getElementById('ganttContainer');
+    const timeline = document.getElementById('ganttTimeline');
     
-    <div class="space-y-4">
-      <h4 class="font-bold text-gray-900 text-lg">Timeline</h4>
-      <div class="bg-gray-50 p-4 rounded-lg space-y-2">
-        <div class="flex justify-between"><span>Start Date:</span><span class="font-semibold">${UIComponents.formatDate(project.startDate)}</span></div>
-        <div class="flex justify-between"><span>End Date:</span><span class="font-semibold">${UIComponents.formatDate(project.endDate)}</span></div>
-      </div>
-    </div>
-  </div>
-  
-  <div class="flex gap-3 pt-4 border-t">
-    <button onclick="ManagerDashboard.generateProjectReport('${project.sd06Code}')" 
-            class="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-      Generate Report
-    </button>
-    <button onclick="ManagerDashboard.closeProjectDetailModal()" 
-            class="py-2 px-4 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors">
-      Close
-    </button>
-  </div>
-`;
-
-UIComponents.showElement('projectDetailModal');
-}
-
-static closeProjectDetailModal() {
-UIComponents.hideElement('projectDetailModal');
-}
-
-static viewTeamDetails(teamLeader) {
-const appState = AppState.getInstance();
-const teamProjects = appState.managerData?.projects?.filter(p => p.teamLeader === teamLeader) || [];
-const totalProjects = teamProjects.length;
-const avgProgress = totalProjects ? Math.round(teamProjects.reduce((sum, p) => sum + (p.progress || 0), 0) / totalProjects) : 0;
-const totalValue = teamProjects.reduce((sum, p) => sum + (p.value || 0), 0);
-
-const content = document.getElementById('teamAnalyticsContent');
-if (!content) return;
-
-content.innerHTML = `
-  <div class="bg-gradient-to-br from-purple-600 to-indigo-700 text-white rounded-2xl p-6 mb-6">
-    <h4 class="text-2xl font-bold mb-2">${teamLeader}</h4>
-    <p class="opacity-90">Team Performance Analytics</p>
-  </div>
-  
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-    <div class="bg-white p-4 rounded-lg border text-center">
-      <div class="text-2xl font-bold text-purple-600">${totalProjects}</div>
-      <div class="text-sm text-gray-600">Total Projects</div>
-    </div>
-    <div class="bg-white p-4 rounded-lg border text-center">
-      <div class="text-2xl font-bold text-green-600">${avgProgress}%</div>
-      <div class="text-sm text-gray-600">Avg Progress</div>
-    </div>
-    <div class="bg-white p-4 rounded-lg border text-center">
-      <div class="text-2xl font-bold text-blue-600">${UIComponents.formatCurrency(totalValue)}</div>
-      <div class="text-sm text-gray-600">Total Value</div>
-    </div>
-    <div class="bg-white p-4 rounded-lg border text-center">
-      <div class="text-2xl font-bold text-amber-600">${Math.round(totalValue / totalProjects) || 0}</div>
-      <div class="text-sm text-gray-600">Avg Value/Project</div>
-    </div>
-  </div>
-  
-  <h5 class="font-bold text-gray-900 mb-4">Team Projects</h5>
-  <div class="space-y-3 max-h-96 overflow-y-auto">
-    ${teamProjects.map(p => `
-      <div class="bg-gray-50 p-4 rounded-lg border">
-        <div class="flex justify-between items-center mb-2">
-          <span class="font-semibold">${p.client}</span>
-          <span class="text-sm ${
-            p.progress >= 80 ? 'text-green-600' : 
-            p.progress >= 50 ? 'text-amber-600' : 'text-red-600'
-          }">${p.progress}%</span>
+    if (!container || !timeline) return;
+    
+    if (!planned.start || !planned.end) {
+      container.innerHTML = '<div class="text-center text-gray-500 py-8">No timeline data available</div>';
+      timeline.innerHTML = '';
+      return;
+    }
+    
+    try {
+      const plannedStart = new Date(planned.start);
+      const plannedEnd = new Date(planned.end);
+      const actualStart = actual.start ? new Date(actual.start) : null;
+      const actualEnd = actual.end ? new Date(actual.end) : null;
+      
+      const allDates = [plannedStart, plannedEnd];
+      if (actualStart) allDates.push(actualStart);
+      if (actualEnd) allDates.push(actualEnd);
+      
+      const minDate = new Date(Math.min(...allDates.map(d => d.getTime())));
+      const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())));
+      const totalDuration = maxDate - minDate;
+      
+      const calculatePosition = (date) => ((date - minDate) / totalDuration) * 100;
+      
+      container.innerHTML = `
+        <div class="relative h-32 bg-gray-100 rounded-lg overflow-hidden">
+          <div class="absolute top-1/2 left-0 right-0 h-1 bg-gray-300 transform -translate-y-1/2"></div>
+          
+          <div class="absolute top-1/4 h-4 bg-blue-500 rounded-full transform -translate-y-1/2" 
+               style="left: ${calculatePosition(plannedStart)}%; width: ${calculatePosition(plannedEnd) - calculatePosition(plannedStart)}%">
+            <div class="absolute -top-6 left-0 right-0 text-center text-xs text-blue-600 font-medium">Planned</div>
+            <div class="absolute -top-12 left-0 text-xs text-blue-500">${UIHelper.formatDate(planned.start)}</div>
+            <div class="absolute -top-12 right-0 text-xs text-blue-500">${UIHelper.formatDate(planned.end)}</div>
+          </div>
+          
+          ${actualStart ? `
+          <div class="absolute top-3/4 h-4 bg-green-500 rounded-full transform -translate-y-1/2" 
+               style="left: ${calculatePosition(actualStart)}%; width: ${calculatePosition(actualEnd || new Date()) - calculatePosition(actualStart)}%">
+            <div class="absolute -bottom-6 left-0 right-0 text-center text-xs text-green-600 font-medium">Actual</div>
+            <div class="absolute -bottom-12 left-0 text-xs text-green-500">${UIHelper.formatDate(actual.start)}</div>
+            ${actualEnd ? `
+            <div class="absolute -bottom-12 right-0 text-xs text-green-500">${UIHelper.formatDate(actual.end)}</div>
+            ` : `
+            <div class="absolute -bottom-12 right-0 text-xs text-green-500">In Progress</div>
+            `}
+          </div>
+          ` : ''}
+          
+          <div class="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-gray-500">
+            <span>${UIHelper.formatDate(minDate)}</span>
+            <span>${UIHelper.formatDate(maxDate)}</span>
+          </div>
         </div>
-        <div class="flex justify-between text-sm text-gray-600">
-          <span>${p.compound}</span>
-          <span>${p.phase}</span>
+      `;
+      
+      // Timeline markers
+      const months = [];
+      let currentDate = new Date(minDate);
+      while (currentDate <= maxDate) {
+        months.push(new Date(currentDate));
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      }
+      
+      timeline.innerHTML = months.map(date => `
+        <div class="gantt-timeline-item" style="left: ${calculatePosition(date)}%;">
+          ${date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+        </div>
+      `).join('');
+      
+    } catch (error) {
+      console.error('Gantt chart rendering error:', error);
+      container.innerHTML = '<div class="text-center text-red-500 py-8">Error rendering timeline</div>';
+    }
+  }
+  
+  static animateProgressCircle(percentage) {
+    const circle = document.getElementById('progressCircle');
+    const label = document.getElementById('progressPercentage');
+    
+    if (!circle || !label) return;
+    
+    const radius = 70;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (percentage / 100) * circumference;
+    
+    circle.style.strokeDashoffset = Math.max(0, Math.min(offset, circumference));
+    label.textContent = `${percentage}%`;
+  }
+  
+  static setStatusChip(status) {
+    const chip = document.getElementById('projectStatusChip');
+    if (!chip) return;
+    
+    const statusText = (status || '').toLowerCase();
+    let className = 'px-6 py-3 rounded-2xl text-sm font-semibold inline-block ';
+    let text = 'On Time';
+    
+    if (statusText.includes('complete')) {
+      className += 'bg-blue-500/10 text-blue-700';
+      text = 'Completed';
+    } else if (statusText.includes('critical')) {
+      className += 'bg-rose-500/10 text-rose-700';
+      text = 'Critical';
+    } else if (statusText.includes('delay')) {
+      className += 'bg-amber-500/10 text-amber-700';
+      text = 'Delayed';
+    } else {
+      className += 'bg-emerald-500/10 text-emerald-700';
+    }
+    
+    chip.className = className;
+    chip.textContent = text;
+  }
+  
+  static calculateDuration(startStr, endStr) {
+    try {
+      const start = startStr ? new Date(startStr) : null;
+      const end = endStr ? new Date(endStr) : null;
+      
+      if (!start || !end || isNaN(start) || isNaN(end)) return '--';
+      
+      const diffTime = Math.abs(end - start);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return `${diffDays} days`;
+    } catch (error) {
+      return '--';
+    }
+  }
+  
+  static renderManagerDashboard(data) {
+    const { projects, teamLeaders, totals } = data;
+    
+    // Update quick stats
+    UIHelper.setText('totalProjectsCount', projects.length);
+    UIHelper.setText('avgProgressValue', `${totals.avgProgress || 0}%`);
+    UIHelper.setText('totalValueAmount', UIHelper.formatCurrency(totals.totalValue));
+    
+    const uniqueTeams = new Set(projects.map(p => p.teamLeader).filter(Boolean));
+    UIHelper.setText('activeTeamsCount', uniqueTeams.size);
+    
+    // Render projects grid
+    this.renderProjectsGrid(projects);
+    this.renderTeamLeaders(teamLeaders);
+  }
+  
+  static renderProjectsGrid(projects) {
+    const grid = document.getElementById('projectsGrid');
+    if (!grid) return;
+    
+    grid.innerHTML = projects.map(project => `
+      <div class="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+        <div class="flex justify-between items-start mb-4">
+          <div>
+            <h3 class="font-bold text-lg text-gray-900">${project.client}</h3>
+            <p class="text-sm text-gray-600">${project.compound}</p>
+          </div>
+          <span class="px-3 py-1 rounded-full text-xs font-semibold ${
+            project.progress >= 80 ? 'bg-green-100 text-green-800' :
+            project.progress >= 50 ? 'bg-yellow-100 text-yellow-800' :
+            'bg-red-100 text-red-800'
+          }">
+            ${project.progress}%
+          </span>
+        </div>
+        
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-gray-600">Phase:</span>
+            <span class="font-semibold">${project.phase}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600">Team Leader:</span>
+            <span class="font-semibold">${project.teamLeader || '--'}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600">Value:</span>
+            <span class="font-semibold">${UIHelper.formatCurrency(project.value)}</span>
+          </div>
+        </div>
+        
+        <div class="mt-4 pt-4 border-t border-gray-200">
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div class="h-2 rounded-full transition-all duration-500 ${
+              project.progress >= 80 ? 'bg-green-500' :
+              project.progress >= 50 ? 'bg-yellow-500' :
+              'bg-red-500'
+            }" style="width: ${project.progress}%"></div>
+          </div>
+        </div>
+        
+        <div class="mt-4 flex space-x-2">
+          <button onclick="AppController.openProjectDetail('${project.sd06Code}')" 
+                  class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm">
+            View Details
+          </button>
         </div>
       </div>
-    `).join('')}
-  </div>
-`;
-
-UIComponents.showElement('teamAnalyticsModal');
-}
-
-static closeTeamAnalyticsModal() {
-UIComponents.hideElement('teamAnalyticsModal');
-}
-
-static generateProjectReport(sd06Code) {
-UIComponents.showNotification(`Generating report for project ${sd06Code}`, 'info');
-// Implementation for report generation
-}
-
-static updateLastUpdate() {
-const today = new Date();
-const dayOfWeek = today.getDay();
-const diff = today.getDate() - dayOfWeek;
-const lastSunday = new Date(today.setDate(diff));
-const formattedDate = lastSunday.toLocaleDateString('en-US', {
-weekday: 'long',
-year: 'numeric',
-month: 'long',
-day: 'numeric'
-});
-
-UIComponents.setText('managerLastUpdate', `Last updated: ${formattedDate}`);
-}
-
-static async refreshData() {
-try {
-UIComponents.showNotification('Refreshing data...', 'info');
-await this.loadDashboardData();
-UIComponents.showNotification('Data refreshed successfully', 'success');
-} catch (error) {
-UIComponents.showNotification('Failed to refresh data', 'error');
-}
-}
-}
-
-// ============= APPLICATION INITIALIZATION =============
-class AppInitializer {
-static init() {
-this.setupEventListeners();
-this.autoLogin();
-this.setupErrorHandling();
-}
-
-static setupEventListeners() {
-// Login form
-const loginForm = document.getElementById('loginForm');
-if (loginForm) {
-loginForm.addEventListener('submit', this.handleLogin.bind(this));
-}
-
-// Logout buttons
-const logoutButtons = document.querySelectorAll('[data-action="logout"]');
-logoutButtons.forEach(button => {
-button.addEventListener('click', this.handleLogout.bind(this));
-});
-
-// Manager dashboard actions
-const refreshButton = document.getElementById('refreshData');
-if (refreshButton) {
-refreshButton.addEventListener('click', () => ManagerDashboard.refreshData());
-}
-
-// Modal close handlers
-this.setupModalHandlers();
-}
-
-static setupModalHandlers() {
-// Project detail modal
-const projectModal = document.getElementById('projectDetailModal');
-if (projectModal) {
-projectModal.addEventListener('click', (e) => {
-  if (e.target === projectModal) {
-    ManagerDashboard.closeProjectDetailModal();
+    `).join('');
   }
-});
-}
-
-// Team analytics modal
-const teamModal = document.getElementById('teamAnalyticsModal');
-if (teamModal) {
-teamModal.addEventListener('click', (e) => {
-  if (e.target === teamModal) {
-    ManagerDashboard.closeTeamAnalyticsModal();
+  
+  static renderTeamLeaders(teamLeaders) {
+    const container = document.getElementById('teamLeadersGrid');
+    if (!container) return;
+    
+    container.innerHTML = teamLeaders.map(leader => `
+      <div class="bg-white rounded-xl border border-gray-200 p-6">
+        <h4 class="font-bold text-lg mb-3">${leader.name}</h4>
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          <div class="text-center">
+            <div class="text-2xl font-bold text-blue-600">${leader.projectCount}</div>
+            <div class="text-gray-600">Projects</div>
+          </div>
+          <div class="text-center">
+            <div class="text-2xl font-bold text-green-600">${leader.avgProgress}%</div>
+            <div class="text-gray-600">Avg Progress</div>
+          </div>
+        </div>
+        <button onclick="AppController.viewTeamDetails('${leader.name}')" 
+                class="w-full mt-4 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors text-sm">
+          View Team
+        </button>
+      </div>
+    `).join('');
   }
-});
-}
-}
-
-static async handleLogin(event) {
-event.preventDefault();
-
-const username = document.getElementById('username')?.value.trim();
-const password = document.getElementById('password')?.value.trim();
-const remember = document.getElementById('rememberMe')?.checked;
-
-if (!username || !password) {
-UIComponents.showNotification('Please enter both username and password', 'warning');
-return;
-}
-
-try {
-UIComponents.showNotification('Signing in...', 'info');
-
-const authResult = await AuthService.authenticate(username, password);
-
-if (!authResult.ok) {
-  throw new Error(authResult.error || 'Authentication failed');
-}
-
-await this.handleAuthSuccess(authResult, remember, {
-  u: btoa(username),
-  p: btoa(password)
-});
-
-} catch (error) {
-console.error('Login error:', error);
-UIComponents.showNotification(error.message || 'Login failed', 'error');
-}
-}
-
-static async handleAuthSuccess(authResult, remember, credentials) {
-const appState = AppState.getInstance();
-
-// Save session
-SessionManager.saveSession(authResult, credentials, remember);
-
-// Load contact data in background
-AuthService.getContactData().then(contactResult => {
-  if (contactResult.ok) {
-    appState.contactData = contactResult.contacts || {};
+  
+  static openProjectDetail(sd06Code) {
+    const appState = AppState.getInstance();
+    const project = appState.managerData?.projects?.find(p => p.sd06Code === sd06Code);
+    
+    if (!project) {
+      UIHelper.showNotification('Project not found', 'error');
+      return;
+    }
+    
+    const modal = document.getElementById('projectDetailModal');
+    const title = document.getElementById('projectDetailTitle');
+    const content = document.getElementById('projectDetailContent');
+    
+    if (!modal || !title || !content) return;
+    
+    title.textContent = `Project Details - ${project.client}`;
+    
+    content.innerHTML = `
+      <div class="grid md:grid-cols-2 gap-6">
+        <div class="space-y-4">
+          <h4 class="font-bold text-gray-900 text-lg">Basic Information</h4>
+          <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+            <div class="flex justify-between"><span>Client:</span><span class="font-semibold">${project.client}</span></div>
+            <div class="flex justify-between"><span>Compound:</span><span class="font-semibold">${project.compound}</span></div>
+            <div class="flex justify-between"><span>SD06 Code:</span><span class="font-semibold">${project.sd06Code}</span></div>
+            <div class="flex justify-between"><span>Phase:</span><span class="font-semibold">${project.phase}</span></div>
+          </div>
+        </div>
+        
+        <div class="space-y-4">
+          <h4 class="font-bold text-gray-900 text-lg">Progress & Status</h4>
+          <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+            <div class="flex justify-between"><span>Execution Progress:</span><span class="font-semibold text-green-600">${project.progress}%</span></div>
+            <div class="flex justify-between"><span>Status:</span><span class="font-semibold">${project.status}</span></div>
+            <div class="flex justify-between"><span>Team Leader:</span><span class="font-semibold">${project.teamLeader || '--'}</span></div>
+            <div class="flex justify-between"><span>Site Manager:</span><span class="font-semibold">${project.siteManager || '--'}</span></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="grid md:grid-cols-2 gap-6">
+        <div class="space-y-4">
+          <h4 class="font-bold text-gray-900 text-lg">Financial Information</h4>
+          <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+            <div class="flex justify-between"><span>Contract Value:</span><span class="font-semibold">${UIHelper.formatCurrency(project.value)}</span></div>
+            <div class="flex justify-between"><span>Amount Paid:</span><span class="font-semibold text-green-600">${UIHelper.formatCurrency(project.paid)}</span></div>
+            <div class="flex justify-between"><span>Pending:</span><span class="font-semibold text-amber-600">${UIHelper.formatCurrency(project.value - project.paid)}</span></div>
+          </div>
+        </div>
+        
+        <div class="space-y-4">
+          <h4 class="font-bold text-gray-900 text-lg">Timeline</h4>
+          <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+            <div class="flex justify-between"><span>Start Date:</span><span class="font-semibold">${UIHelper.formatDate(project.startDate)}</span></div>
+            <div class="flex justify-between"><span>End Date:</span><span class="font-semibold">${UIHelper.formatDate(project.endDate)}</span></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex gap-3 pt-4 border-t">
+        <button onclick="AppController.generateProjectReport('${project.sd06Code}')" 
+                class="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          Generate Report
+        </button>
+        <button onclick="AppController.closeProjectDetailModal()" 
+                class="py-2 px-4 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors">
+          Close
+        </button>
+      </div>
+    `;
+    
+    UIHelper.showElement('projectDetailModal');
   }
-});
-
-// Redirect based on role
-if (authResult.role === 'manager') {
-  await ManagerDashboard.initialize();
-} else {
-  await ClientDashboard.initialize(authResult);
-}
-
-UIComponents.showNotification(`Welcome, ${authResult.name}!`, 'success');
-}
-
-static handleLogout() {
-const appState = AppState.getInstance();
-appState.clear();
-SessionManager.clearSession();
-
-UIComponents.hideElement('clientDashboard');
-UIComponents.hideElement('managerDashboard');
-UIComponents.showElement('loginScreen');
-
-// Clear form
-const loginForm = document.getElementById('loginForm');
-if (loginForm) loginForm.reset();
-
-UIComponents.showNotification('Logged out successfully', 'info');
-}
-
-static autoLogin() {
-SessionManager.autoLogin();
-}
-
-static setupErrorHandling() {
-// Global error handler
-window.addEventListener('error', (event) => {
-console.error('Global error:', event.error);
-});
-
-// Unhandled promise rejection handler
-window.addEventListener('unhandledrejection', (event) => {
-console.error('Unhandled promise rejection:', event.reason);
-event.preventDefault();
-});
-}
+  
+  static closeProjectDetailModal() {
+    UIHelper.hideElement('projectDetailModal');
+  }
+  
+  static viewTeamDetails(teamLeader) {
+    const appState = AppState.getInstance();
+    const teamProjects = appState.managerData?.projects?.filter(p => p.teamLeader === teamLeader) || [];
+    const totalProjects = teamProjects.length;
+    const avgProgress = totalProjects ? Math.round(teamProjects.reduce((sum, p) => sum + (p.progress || 0), 0) / totalProjects) : 0;
+    const totalValue = teamProjects.reduce((sum, p) => sum + (p.value || 0), 0);
+    
+    const content = document.getElementById('teamAnalyticsContent');
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div class="bg-gradient-to-br from-purple-600 to-indigo-700 text-white rounded-2xl p-6 mb-6">
+        <h4 class="text-2xl font-bold mb-2">${teamLeader}</h4>
+        <p class="opacity-90">Team Performance Analytics</p>
+      </div>
+      
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white p-4 rounded-lg border text-center">
+          <div class="text-2xl font-bold text-purple-600">${totalProjects}</div>
+          <div class="text-sm text-gray-600">Total Projects</div>
+        </div>
+        <div class="bg-white p-4 rounded-lg border text-center">
+          <div class="text-2xl font-bold text-green-600">${avgProgress}%</div>
+          <div class="text-sm text-gray-600">Avg Progress</div>
+        </div>
+        <div class="bg-white p-4 rounded-lg border text-center">
+          <div class="text-2xl font-bold text-blue-600">${UIHelper.formatCurrency(totalValue)}</div>
+          <div class="text-sm text-gray-600">Total Value</div>
+        </div>
+        <div class="bg-white p-4 rounded-lg border text-center">
+          <div class="text-2xl font-bold text-amber-600">${Math.round(totalValue / totalProjects) || 0}</div>
+          <div class="text-sm text-gray-600">Avg Value/Project</div>
+        </div>
+      </div>
+      
+      <h5 class="font-bold text-gray-900 mb-4">Team Projects</h5>
+      <div class="space-y-3 max-h-96 overflow-y-auto">
+        ${teamProjects.map(p => `
+          <div class="bg-gray-50 p-4 rounded-lg border">
+            <div class="flex justify-between items-center mb-2">
+              <span class="font-semibold">${p.client}</span>
+              <span class="text-sm ${
+                p.progress >= 80 ? 'text-green-600' : 
+                p.progress >= 50 ? 'text-amber-600' : 'text-red-600'
+              }">${p.progress}%</span>
+            </div>
+            <div class="flex justify-between text-sm text-gray-600">
+              <span>${p.compound}</span>
+              <span>${p.phase}</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    
+    UIHelper.showElement('teamAnalyticsModal');
+  }
+  
+  static closeTeamAnalyticsModal() {
+    UIHelper.hideElement('teamAnalyticsModal');
+  }
+  
+  static generateProjectReport(sd06Code) {
+    UIHelper.showNotification(`Generating report for project ${sd06Code}`, 'info');
+  }
+  
+  static showNoUnitsMessage() {
+    UIHelper.setText('dashboardTitle', 'No Units Available');
+    UIHelper.setText('dashboardSubtitle', 'Please contact administrator');
+    UIHelper.hideElement('unitContent');
+  }
+  
+  static updateLastUpdate() {
+    const lastUpdate = UIHelper.getLastSunday();
+    UIHelper.setText('lastUpdate', `Last updated: ${lastUpdate}`);
+    UIHelper.setText('managerLastUpdate', `Last updated: ${lastUpdate}`);
+  }
+  
+  static handleLogout() {
+    const appState = AppState.getInstance();
+    appState.clear();
+    SessionManager.clearSession();
+    
+    UIHelper.hideElement('clientDashboard');
+    UIHelper.hideElement('managerDashboard');
+    UIHelper.showElement('loginScreen');
+    
+    // Clear form
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) loginForm.reset();
+    
+    UIHelper.showNotification('Logged out successfully', 'info');
+  }
+  
+  static setupErrorHandling() {
+    window.addEventListener('error', (event) => {
+      console.error('Global error:', event.error);
+    });
+    
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('Unhandled promise rejection:', event.reason);
+    });
+  }
 }
 
 // ============= APPLICATION STARTUP =============
 document.addEventListener('DOMContentLoaded', () => {
-console.log('PlanSee Portal Initializing...');
-AppInitializer.init();
+  console.log('PlanSee Portal Initializing...');
+  AppController.initialize();
 });
 
 // ============= GLOBAL EXPORTS FOR HTML EVENT HANDLERS =============
-window.ClientDashboard = ClientDashboard;
-window.ManagerDashboard = ManagerDashboard;
-window.AppInitializer = AppInitializer;
+window.AppController = AppController;
 
 // Global utility functions for backward compatibility
 function logout() {
-AppInitializer.handleLogout();
+  AppController.handleLogout();
 }
 
 function switchUnit(sd06Code) {
-ClientDashboard.switchUnit(sd06Code);
+  AppController.switchUnit(sd06Code);
 }
 
-console.log('PlanSee Portal - Enhanced Professional Version Loaded');
-    
-    [
+// Legacy function compatibility
+function onAuth(res, remember, creds) {
+  AppController.handleAuthSuccess(res, remember, creds);
+}
+
+console.log('PlanSee Portal - Professional Version Loaded');
