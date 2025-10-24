@@ -5,7 +5,7 @@
 
 // ============= CONFIGURATION & CONSTANTS =============
 const CONFIG = {
-  API_URL: "https://script.google.com/macros/s/AKfycbwoVtdUl4nKCccGY2lRXZbEK5yJx_PP92I1DVtei9IXTEqO1pkJWb37nZx1-EUDasod/exec",
+  API_URL: "https://script.google.com/macros/s/AKfycbx7dD-jPp217vp01IZN6qG_FiYgRRAIqP5UT-CJqc0h6N8nrfOTOZK9S0ax7mqkvfIa/exec",
   REQUEST_TIMEOUT: 30000,
   CACHE_TTL: 5 * 60 * 1000, // 5 minutes
   MAX_CONCURRENT_REQUESTS: 3
