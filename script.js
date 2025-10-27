@@ -1,7 +1,7 @@
 /******************************************************
  * ENHANCED PROJECT PORTAL - PROFESSIONAL FRONTEND
  * PlanSee Interiors - Optimized for Performance & UX
- * REVISED: Execution Progress & Timeline First
+ * REVISED ORDER: Execution Progress & Timeline First
  ******************************************************/
 
 // ============= CONFIGURATION =============
