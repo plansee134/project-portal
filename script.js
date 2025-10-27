@@ -1,338 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PlanSee Interiors - Client Portal</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .fade-in {
-            animation: fadeIn 0.5s ease-in;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .progress-ring__circle {
-            transition: stroke-dashoffset 0.5s ease-in-out;
-            transform: rotate(-90deg);
-            transform-origin: 50% 50%;
-        }
-        .gantt-bar {
-            transition: all 0.3s ease;
-        }
-        .hover-lift:hover {
-            transform: translateY(-2px);
-            transition: transform 0.2s ease;
-        }
-    </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg p-6 flex items-center space-x-3">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span class="text-gray-700">Loading...</span>
-        </div>
-    </div>
-
-    <!-- Login Screen -->
-    <div id="loginScreen" class="min-h-screen flex items-center justify-center px-4">
-        <div class="max-w-md w-full space-y-8">
-            <div class="text-center">
-                <h2 class="text-3xl font-bold text-gray-900">PlanSee Interiors</h2>
-                <p class="mt-2 text-gray-600">Client & Manager Portal</p>
-            </div>
-            <form id="loginForm" class="mt-8 space-y-6 bg-white p-8 rounded-2xl shadow-lg">
-                <div>
-                    <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
-                    <input id="username" name="username" type="text" required 
-                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-                    <input id="password" name="password" type="password" required 
-                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div class="flex items-center">
-                    <input id="rememberMe" name="rememberMe" type="checkbox" 
-                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    <label for="rememberMe" class="ml-2 block text-sm text-gray-900">Remember me</label>
-                </div>
-                <button type="submit" 
-                        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    Sign in
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Client Dashboard -->
-    <div id="clientDashboard" class="hidden">
-        <!-- Header -->
-        <header class="bg-white shadow-sm border-b">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-center h-16">
-                    <div class="flex items-center">
-                        <h1 class="text-xl font-semibold text-gray-900">PlanSee Interiors</h1>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <span id="welcomeUser" class="text-sm text-gray-700"></span>
-                        <button onclick="logout()" 
-                                class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition-colors">
-                            Logout
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <!-- Unit Tabs -->
-        <div id="unitTabs" class="bg-white border-b hidden">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div id="unitTabsContainer" class="flex space-x-1 overflow-x-auto py-2">
-                    <!-- Unit tabs will be dynamically generated here -->
-                </div>
-            </div>
-        </div>
-
-        <!-- Main Content -->
-        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <!-- Progress & Timeline Section -->
-            <section class="mb-8">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- Progress Overview -->
-                    <div class="lg:col-span-1">
-                        <div class="bg-white rounded-2xl shadow-lg p-6 hover-lift">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Project Progress</h3>
-                            <div class="flex flex-col items-center justify-center">
-                                <div class="relative w-48 h-48 mb-4">
-                                    <svg class="w-full h-full" viewBox="0 0 160 160">
-                                        <circle cx="80" cy="80" r="70" stroke="#e5e7eb" stroke-width="12" fill="none"/>
-                                        <circle id="progressCircle" cx="80" cy="80" r="70" stroke="#3b82f6" 
-                                                stroke-width="12" fill="none" stroke-dasharray="439.8" 
-                                                stroke-dashoffset="439.8" class="progress-ring__circle"/>
-                                        <text id="progressPercentage" x="80" y="85" text-anchor="middle" 
-                                              font-size="24" font-weight="bold" fill="#1f2937">0%</text>
-                                    </svg>
-                                </div>
-                                <div id="projectStatusChip" 
-                                     class="px-6 py-3 rounded-2xl text-sm font-semibold inline-block bg-blue-500/10 text-blue-700 mb-3">
-                                    IN PROGRESS
-                                </div>
-                                <p id="overallProgressText" class="text-center text-gray-600">
-                                    Project is currently in progress
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Timeline & Gantt Chart -->
-                    <div class="lg:col-span-2">
-                        <div class="bg-white rounded-2xl shadow-lg p-6 hover-lift">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Project Timeline</h3>
-                            <div class="space-y-6">
-                                <!-- Timeline Summary -->
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div class="bg-blue-50 p-4 rounded-lg">
-                                        <h4 class="text-sm font-medium text-blue-800 mb-2">Planned Timeline</h4>
-                                        <div class="space-y-1 text-sm">
-                                            <div class="flex justify-between">
-                                                <span>Start:</span>
-                                                <span id="plannedStartDate" class="font-semibold">--</span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span>End:</span>
-                                                <span id="plannedEndDate" class="font-semibold">--</span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span>Duration:</span>
-                                                <span id="plannedDuration" class="font-semibold">--</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="bg-green-50 p-4 rounded-lg">
-                                        <h4 class="text-sm font-medium text-green-800 mb-2">Actual Timeline</h4>
-                                        <div class="space-y-1 text-sm">
-                                            <div class="flex justify-between">
-                                                <span>Start:</span>
-                                                <span id="actualStartDate" class="font-semibold">--</span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span>End:</span>
-                                                <span id="actualEndDate" class="font-semibold">--</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Gantt Chart -->
-                                <div>
-                                    <h4 class="text-sm font-medium text-gray-700 mb-3">Progress Visualization</h4>
-                                    <div id="ganttContainer" class="bg-gray-50 rounded-lg p-4">
-                                        <!-- Gantt chart will be rendered here -->
-                                        <div class="text-center text-gray-500 py-8">Loading timeline data...</div>
-                                    </div>
-                                    <div id="ganttTimeline" class="flex justify-between text-xs text-gray-500 mt-2 relative">
-                                        <!-- Timeline markers will be rendered here -->
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Project Information Section -->
-            <section id="unitContent" class="fade-in">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- Left Column: Basic Information & Design Details -->
-                    <div class="lg:col-span-1 space-y-6">
-                        <!-- Basic Information -->
-                        <div class="bg-white rounded-2xl shadow-lg p-6 hover-lift">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
-                            <div class="space-y-3">
-                                <div class="flex justify-between items-center py-2 border-b border-gray-100">
-                                    <span class="text-gray-600">Client Name</span>
-                                    <span id="clientNameValue" class="font-semibold">--</span>
-                                </div>
-                                <div class="flex justify-between items-center py-2 border-b border-gray-100">
-                                    <span class="text-gray-600">Compound</span>
-                                    <span id="compoundValue" class="font-semibold">--</span>
-                                </div>
-                                <div class="flex justify-between items-center py-2 border-b border-gray-100">
-                                    <span class="text-gray-600">Unit Type</span>
-                                    <span id="unitTypeValue" class="font-semibold">--</span>
-                                </div>
-                                <div class="flex justify-between items-center py-2 border-b border-gray-100">
-                                    <span class="text-gray-600">Unit Number</span>
-                                    <span id="unitNumberValue" class="font-semibold">--</span>
-                                </div>
-                                <div class="flex justify-between items-center py-2 border-b border-gray-100">
-                                    <span class="text-gray-600">Floors</span>
-                                    <span id="floorsValue" class="font-semibold">--</span>
-                                </div>
-                                <div class="flex justify-between items-center py-2 border-b border-gray-100">
-                                    <span class="text-gray-600">Indoor Area</span>
-                                    <span id="indoorAreaValue" class="font-semibold">--</span>
-                                </div>
-                                <div class="flex justify-between items-center py-2">
-                                    <span class="text-gray-600">Outdoor Area</span>
-                                    <span id="outdoorAreaValue" class="font-semibold">--</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Design Details -->
-                        <div class="bg-white rounded-2xl shadow-lg p-6 hover-lift">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Design Details</h3>
-                            <div class="space-y-3">
-                                <div class="flex justify-between items-center py-2 border-b border-gray-100">
-                                    <span class="text-gray-600">Design Type</span>
-                                    <span id="designTypeVal" class="font-semibold">--</span>
-                                </div>
-                                <div class="flex justify-between items-center py-2 border-b border-gray-100">
-                                    <span class="text-gray-600">Design Status</span>
-                                    <span id="designStatusVal" class="font-semibold">--</span>
-                                </div>
-                                <div class="flex justify-between items-center py-2">
-                                    <span class="text-gray-600">Project Status</span>
-                                    <span id="projectStatusVal" class="font-semibold">--</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Middle Column: Work Progress -->
-                    <div class="lg:col-span-1">
-                        <div class="bg-white rounded-2xl shadow-lg p-6 hover-lift h-full">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-semibold text-gray-900">Work Progress</h3>
-                                <span id="workPhaseLabel" class="text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
-                                    Phase 1
-                                </span>
-                            </div>
-                            <div id="workGrid" class="grid gap-4">
-                                <!-- Work progress items will be dynamically generated here -->
-                                <div class="text-center text-gray-500 py-8">Loading work progress...</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Right Column: Team Information & 3D View -->
-                    <div class="lg:col-span-1 space-y-6">
-                        <!-- Team Information -->
-                        <div class="bg-white rounded-2xl shadow-lg p-6 hover-lift">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Project Team</h3>
-                            <div class="space-y-4">
-                                <div class="contact-card bg-gray-50 p-4 rounded-lg">
-                                    <div class="flex items-center space-x-3">
-                                        <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                                            <span class="text-white font-semibold">TL</span>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm text-gray-600">Team Leader</p>
-                                            <p id="teamLeaderNameTeam" class="font-semibold">--</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="contact-card bg-gray-50 p-4 rounded-lg">
-                                    <div class="flex items-center space-x-3">
-                                        <div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
-                                            <span class="text-white font-semibold">AM</span>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm text-gray-600">Account Manager</p>
-                                            <p id="accountManagerNameTeam" class="font-semibold">--</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="contact-card bg-gray-50 p-4 rounded-lg">
-                                    <div class="flex items-center space-x-3">
-                                        <div class="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
-                                            <span class="text-white font-semibold">SM</span>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm text-gray-600">Site Manager</p>
-                                            <p id="siteManagerName" class="font-semibold">--</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 3D View -->
-                        <div id="threeDCard" class="bg-white rounded-2xl shadow-lg p-6 hover-lift hidden">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">3D Project View</h3>
-                            <div class="aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                                <iframe id="threeDIframe" class="w-full h-full hidden" 
-                                        frameborder="0" allowfullscreen></iframe>
-                                <div id="threeDPlaceholder" class="w-full h-full flex items-center justify-center text-gray-500">
-                                    3D view not available
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Last Update -->
-            <div class="mt-8 text-center">
-                <p id="lastUpdate" class="text-sm text-gray-500">Last updated: --</p>
-            </div>
-        </main>
-    </div>
-
-    <!-- Manager Dashboard (Hidden by default) -->
-    <div id="managerDashboard" class="hidden">
-        <!-- Manager dashboard content would go here -->
-    </div>
-
-<script>
 /******************************************************
  * ENHANCED PROJECT PORTAL - PROFESSIONAL FRONTEND
  * PlanSee Interiors - Optimized for Performance & UX
+ * Client-First Design: Progress & Timeline First
  ******************************************************/
 
 // ============= CONFIGURATION =============
@@ -521,6 +190,7 @@ class ApiService {
   }
   
   static showLoading() {
+    // Create loading overlay if it doesn't exist
     let overlay = document.getElementById('loadingOverlay');
     if (!overlay) {
       overlay = document.createElement('div');
@@ -636,6 +306,7 @@ class SessionManager {
         const username = atob(session.credentials.u);
         const password = atob(session.credentials.p);
         
+        // Pre-fill login form
         const usernameField = document.getElementById('username');
         const passwordField = document.getElementById('password');
         const rememberField = document.getElementById('rememberMe');
@@ -673,8 +344,9 @@ class UIHelper {
   }
   
   static showNotification(message, type = 'info') {
+    // Simple notification system - can be enhanced with toast library
     console.log(`[${type.toUpperCase()}] ${message}`);
-    alert(message);
+    alert(message); // Temporary - replace with proper toast
   }
   
   static formatCurrency(amount) {
@@ -734,14 +406,24 @@ class AppController {
   }
   
   static setupEventListeners() {
+    // Login form
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
       loginForm.addEventListener('submit', this.handleLogin.bind(this));
     }
     
+    // Logout buttons
     document.addEventListener('click', (e) => {
       if (e.target.matches('[data-action="logout"]')) {
         this.handleLogout();
+      }
+    });
+    
+    // Tab navigation for client dashboard
+    document.addEventListener('click', (e) => {
+      if (e.target.matches('.client-tab')) {
+        const target = e.target.getAttribute('data-tab');
+        this.switchClientTab(target);
       }
     });
   }
@@ -782,10 +464,13 @@ class AppController {
     const appState = AppState.getInstance();
     appState.currentAuth = authResult;
     
+    // Save session
     SessionManager.saveSession(authResult, credentials, remember);
     
+    // Load contact data in background
     this.loadContactData();
     
+    // Redirect based on role
     if (authResult.role === 'manager') {
       await this.loadManagerDashboard();
     } else {
@@ -867,11 +552,13 @@ class AppController {
   }
   
   static async switchUnit(sd06Code) {
+    // Update active tab
     document.querySelectorAll('.unit-tab').forEach(tab => 
       tab.classList.remove('active')
     );
     document.querySelector(`[data-unit="${sd06Code}"]`)?.classList.add('active');
     
+    // Load unit data
     await this.loadUnitData(sd06Code);
   }
   
@@ -902,6 +589,9 @@ class AppController {
   static renderClientData(report) {
     const { unit, design, execution, executionTimeline, view3D, currentPhase } = report;
     
+    // Set active tab to progress first
+    this.switchClientTab('progress');
+    
     // Basic Information
     UIHelper.setText('clientNameValue', unit.clientName);
     UIHelper.setText('compoundValue', unit.compound);
@@ -911,7 +601,7 @@ class AppController {
     UIHelper.setText('indoorAreaValue', unit.areaIndoor);
     UIHelper.setText('outdoorAreaValue', unit.areaOutdoor);
     
-    // Design Details
+    // Project Details
     UIHelper.setText('designTypeVal', design.designType);
     UIHelper.setText('designStatusVal', design.designStatus);
     UIHelper.setText('projectStatusVal', design.projectStatus);
@@ -1040,6 +730,7 @@ class AppController {
   static setupContactButtons(teamLeader, accountManager) {
     const appState = AppState.getInstance();
     
+    // Team Leader contact
     if (teamLeader && teamLeader !== '--') {
       const teamLeaderCard = document.querySelector('#teamLeaderNameTeam')?.closest('.contact-card');
       if (teamLeaderCard) {
@@ -1049,6 +740,7 @@ class AppController {
       }
     }
     
+    // Account Manager contact
     if (accountManager && accountManager !== '--') {
       const accountManagerCard = document.querySelector('#accountManagerNameTeam')?.closest('.contact-card');
       if (accountManagerCard) {
@@ -1069,6 +761,7 @@ class AppController {
     
     let phoneNumber = appState.contactData[name];
     
+    // Search by name parts
     if (!phoneNumber) {
       const nameParts = name.split(' ').filter(part => part.length > 2);
       for (const part of nameParts) {
@@ -1077,6 +770,7 @@ class AppController {
       }
     }
     
+    // Fuzzy search
     if (!phoneNumber) {
       for (const [contactName, number] of Object.entries(appState.contactData)) {
         if (name.toLowerCase().includes(contactName.toLowerCase()) || 
@@ -1178,6 +872,7 @@ class AppController {
         </div>
       `;
       
+      // Timeline markers
       const months = [];
       let currentDate = new Date(minDate);
       while (currentDate <= maxDate) {
@@ -1251,8 +946,268 @@ class AppController {
     }
   }
   
+  static switchClientTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.client-tab-content').forEach(tab => {
+      tab.classList.add('hidden');
+    });
+    
+    // Remove active class from all tabs
+    document.querySelectorAll('.client-tab').forEach(tab => {
+      tab.classList.remove('active');
+    });
+    
+    // Show selected tab content
+    const selectedTab = document.getElementById(`${tabName}Tab`);
+    if (selectedTab) {
+      selectedTab.classList.remove('hidden');
+    }
+    
+    // Activate selected tab
+    const selectedTabButton = document.querySelector(`[data-tab="${tabName}"]`);
+    if (selectedTabButton) {
+      selectedTabButton.classList.add('active');
+    }
+  }
+  
   static renderManagerDashboard(data) {
-    // Manager dashboard rendering logic would go here
+    const { projects, teamLeaders, totals } = data;
+    
+    // Update quick stats
+    UIHelper.setText('totalProjectsCount', projects.length);
+    UIHelper.setText('avgProgressValue', `${totals.avgProgress || 0}%`);
+    UIHelper.setText('totalValueAmount', UIHelper.formatCurrency(totals.totalValue));
+    
+    const uniqueTeams = new Set(projects.map(p => p.teamLeader).filter(Boolean));
+    UIHelper.setText('activeTeamsCount', uniqueTeams.size);
+    
+    // Render projects grid
+    this.renderProjectsGrid(projects);
+    this.renderTeamLeaders(teamLeaders);
+  }
+  
+  static renderProjectsGrid(projects) {
+    const grid = document.getElementById('projectsGrid');
+    if (!grid) return;
+    
+    grid.innerHTML = projects.map(project => `
+      <div class="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+        <div class="flex justify-between items-start mb-4">
+          <div>
+            <h3 class="font-bold text-lg text-gray-900">${project.client}</h3>
+            <p class="text-sm text-gray-600">${project.compound}</p>
+          </div>
+          <span class="px-3 py-1 rounded-full text-xs font-semibold ${
+            project.progress >= 80 ? 'bg-green-100 text-green-800' :
+            project.progress >= 50 ? 'bg-yellow-100 text-yellow-800' :
+            'bg-red-100 text-red-800'
+          }">
+            ${project.progress}%
+          </span>
+        </div>
+        
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-gray-600">Phase:</span>
+            <span class="font-semibold">${project.phase}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600">Team Leader:</span>
+            <span class="font-semibold">${project.teamLeader || '--'}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600">Value:</span>
+            <span class="font-semibold">${UIHelper.formatCurrency(project.value)}</span>
+          </div>
+        </div>
+        
+        <div class="mt-4 pt-4 border-t border-gray-200">
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div class="h-2 rounded-full transition-all duration-500 ${
+              project.progress >= 80 ? 'bg-green-500' :
+              project.progress >= 50 ? 'bg-yellow-500' :
+              'bg-red-500'
+            }" style="width: ${project.progress}%"></div>
+          </div>
+        </div>
+        
+        <div class="mt-4 flex space-x-2">
+          <button onclick="AppController.openProjectDetail('${project.sd06Code}')" 
+                  class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm">
+            View Details
+          </button>
+        </div>
+      </div>
+    `).join('');
+  }
+  
+  static renderTeamLeaders(teamLeaders) {
+    const container = document.getElementById('teamLeadersGrid');
+    if (!container) return;
+    
+    container.innerHTML = teamLeaders.map(leader => `
+      <div class="bg-white rounded-xl border border-gray-200 p-6">
+        <h4 class="font-bold text-lg mb-3">${leader.name}</h4>
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          <div class="text-center">
+            <div class="text-2xl font-bold text-blue-600">${leader.projectCount}</div>
+            <div class="text-gray-600">Projects</div>
+          </div>
+          <div class="text-center">
+            <div class="text-2xl font-bold text-green-600">${leader.avgProgress}%</div>
+            <div class="text-gray-600">Avg Progress</div>
+          </div>
+        </div>
+        <button onclick="AppController.viewTeamDetails('${leader.name}')" 
+                class="w-full mt-4 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors text-sm">
+          View Team
+        </button>
+      </div>
+    `).join('');
+  }
+  
+  static openProjectDetail(sd06Code) {
+    const appState = AppState.getInstance();
+    const project = appState.managerData?.projects?.find(p => p.sd06Code === sd06Code);
+    
+    if (!project) {
+      UIHelper.showNotification('Project not found', 'error');
+      return;
+    }
+    
+    const modal = document.getElementById('projectDetailModal');
+    const title = document.getElementById('projectDetailTitle');
+    const content = document.getElementById('projectDetailContent');
+    
+    if (!modal || !title || !content) return;
+    
+    title.textContent = `Project Details - ${project.client}`;
+    
+    content.innerHTML = `
+      <div class="grid md:grid-cols-2 gap-6">
+        <div class="space-y-4">
+          <h4 class="font-bold text-gray-900 text-lg">Basic Information</h4>
+          <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+            <div class="flex justify-between"><span>Client:</span><span class="font-semibold">${project.client}</span></div>
+            <div class="flex justify-between"><span>Compound:</span><span class="font-semibold">${project.compound}</span></div>
+            <div class="flex justify-between"><span>SD06 Code:</span><span class="font-semibold">${project.sd06Code}</span></div>
+            <div class="flex justify-between"><span>Phase:</span><span class="font-semibold">${project.phase}</span></div>
+          </div>
+        </div>
+        
+        <div class="space-y-4">
+          <h4 class="font-bold text-gray-900 text-lg">Progress & Status</h4>
+          <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+            <div class="flex justify-between"><span>Execution Progress:</span><span class="font-semibold text-green-600">${project.progress}%</span></div>
+            <div class="flex justify-between"><span>Status:</span><span class="font-semibold">${project.status}</span></div>
+            <div class="flex justify-between"><span>Team Leader:</span><span class="font-semibold">${project.teamLeader || '--'}</span></div>
+            <div class="flex justify-between"><span>Site Manager:</span><span class="font-semibold">${project.siteManager || '--'}</span></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="grid md:grid-cols-2 gap-6">
+        <div class="space-y-4">
+          <h4 class="font-bold text-gray-900 text-lg">Financial Information</h4>
+          <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+            <div class="flex justify-between"><span>Contract Value:</span><span class="font-semibold">${UIHelper.formatCurrency(project.value)}</span></div>
+            <div class="flex justify-between"><span>Amount Paid:</span><span class="font-semibold text-green-600">${UIHelper.formatCurrency(project.paid)}</span></div>
+            <div class="flex justify-between"><span>Pending:</span><span class="font-semibold text-amber-600">${UIHelper.formatCurrency(project.value - project.paid)}</span></div>
+          </div>
+        </div>
+        
+        <div class="space-y-4">
+          <h4 class="font-bold text-gray-900 text-lg">Timeline</h4>
+          <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+            <div class="flex justify-between"><span>Start Date:</span><span class="font-semibold">${UIHelper.formatDate(project.startDate)}</span></div>
+            <div class="flex justify-between"><span>End Date:</span><span class="font-semibold">${UIHelper.formatDate(project.endDate)}</span></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex gap-3 pt-4 border-t">
+        <button onclick="AppController.generateProjectReport('${project.sd06Code}')" 
+                class="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          Generate Report
+        </button>
+        <button onclick="AppController.closeProjectDetailModal()" 
+                class="py-2 px-4 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors">
+          Close
+        </button>
+      </div>
+    `;
+    
+    UIHelper.showElement('projectDetailModal');
+  }
+  
+  static closeProjectDetailModal() {
+    UIHelper.hideElement('projectDetailModal');
+  }
+  
+  static viewTeamDetails(teamLeader) {
+    const appState = AppState.getInstance();
+    const teamProjects = appState.managerData?.projects?.filter(p => p.teamLeader === teamLeader) || [];
+    const totalProjects = teamProjects.length;
+    const avgProgress = totalProjects ? Math.round(teamProjects.reduce((sum, p) => sum + (p.progress || 0), 0) / totalProjects) : 0;
+    const totalValue = teamProjects.reduce((sum, p) => sum + (p.value || 0), 0);
+    
+    const content = document.getElementById('teamAnalyticsContent');
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div class="bg-gradient-to-br from-purple-600 to-indigo-700 text-white rounded-2xl p-6 mb-6">
+        <h4 class="text-2xl font-bold mb-2">${teamLeader}</h4>
+        <p class="opacity-90">Team Performance Analytics</p>
+      </div>
+      
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white p-4 rounded-lg border text-center">
+          <div class="text-2xl font-bold text-purple-600">${totalProjects}</div>
+          <div class="text-sm text-gray-600">Total Projects</div>
+        </div>
+        <div class="bg-white p-4 rounded-lg border text-center">
+          <div class="text-2xl font-bold text-green-600">${avgProgress}%</div>
+          <div class="text-sm text-gray-600">Avg Progress</div>
+        </div>
+        <div class="bg-white p-4 rounded-lg border text-center">
+          <div class="text-2xl font-bold text-blue-600">${UIHelper.formatCurrency(totalValue)}</div>
+          <div class="text-sm text-gray-600">Total Value</div>
+        </div>
+        <div class="bg-white p-4 rounded-lg border text-center">
+          <div class="text-2xl font-bold text-amber-600">${Math.round(totalValue / totalProjects) || 0}</div>
+          <div class="text-sm text-gray-600">Avg Value/Project</div>
+        </div>
+      </div>
+      
+      <h5 class="font-bold text-gray-900 mb-4">Team Projects</h5>
+      <div class="space-y-3 max-h-96 overflow-y-auto">
+        ${teamProjects.map(p => `
+          <div class="bg-gray-50 p-4 rounded-lg border">
+            <div class="flex justify-between items-center mb-2">
+              <span class="font-semibold">${p.client}</span>
+              <span class="text-sm ${
+                p.progress >= 80 ? 'text-green-600' : 
+                p.progress >= 50 ? 'text-amber-600' : 'text-red-600'
+              }">${p.progress}%</span>
+            </div>
+            <div class="flex justify-between text-sm text-gray-600">
+              <span>${p.compound}</span>
+              <span>${p.phase}</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    
+    UIHelper.showElement('teamAnalyticsModal');
+  }
+  
+  static closeTeamAnalyticsModal() {
+    UIHelper.hideElement('teamAnalyticsModal');
+  }
+  
+  static generateProjectReport(sd06Code) {
+    UIHelper.showNotification(`Generating report for project ${sd06Code}`, 'info');
   }
   
   static showNoUnitsMessage() {
@@ -1276,6 +1231,7 @@ class AppController {
     UIHelper.hideElement('managerDashboard');
     UIHelper.showElement('loginScreen');
     
+    // Clear form
     const loginForm = document.getElementById('loginForm');
     if (loginForm) loginForm.reset();
     
@@ -1302,6 +1258,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============= GLOBAL EXPORTS FOR HTML EVENT HANDLERS =============
 window.AppController = AppController;
 
+// Global utility functions for backward compatibility
 function logout() {
   AppController.handleLogout();
 }
@@ -1316,6 +1273,3 @@ function onAuth(res, remember, creds) {
 }
 
 console.log('PlanSee Portal - Professional Version Loaded');
-</script>
-</body>
-</html>
